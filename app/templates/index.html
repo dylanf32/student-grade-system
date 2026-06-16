@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Grade Management Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Dashboard Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <i class="fa-solid fa-graduation-cap header-icon"></i>
+                <div class="header-title-wrapper">
+                    <h1>Student Grade System</h1>
+                    <p class="header-subtitle">Academic Performance Control Center</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span id="connection-status" class="status-pill status-connected">
+                    <span class="status-indicator-dot"></span>
+                    Connected
+                </span>
+                <button id="btn-save-db" class="btn btn-secondary">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Database
+                </button>
+            </div>
+        </header>
+
+        <!-- Statistics Overview Grid -->
+        <section class="stats-grid">
+            <!-- Total Students -->
+            <div class="stat-card">
+                <div class="stat-icon icon-blue">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Total Students</span>
+                    <h3 id="stat-total" class="stat-value">0</h3>
+                </div>
+            </div>
+            <!-- Average Grade -->
+            <div class="stat-card">
+                <div class="stat-icon icon-purple">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Class Average</span>
+                    <h3 id="stat-average" class="stat-value">0.0</h3>
+                </div>
+            </div>
+            <!-- Highest Grade -->
+            <div class="stat-card">
+                <div class="stat-icon icon-green">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Highest Grade</span>
+                    <h3 id="stat-highest" class="stat-value">0</h3>
+                </div>
+            </div>
+            <!-- Lowest Grade -->
+            <div class="stat-card">
+                <div class="stat-icon icon-red">
+                    <i class="fa-solid fa-arrow-down-short-wide"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Lowest Grade</span>
+                    <h3 id="stat-lowest" class="stat-value">0</h3>
+                </div>
+            </div>
+            <!-- Passing Rate -->
+            <div class="stat-card">
+                <div class="stat-icon icon-teal">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Passing Rate</span>
+                    <h3 id="stat-pass-rate" class="stat-value">0%</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Dashboard Workspace -->
+        <main class="dashboard-main">
+            <!-- Left Panel: Controls & Input -->
+            <div class="control-panel">
+                <!-- Add Student Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-user-plus"></i> Add New Student</h2>
+                    </div>
+                    <div class="card-body">
+                        <form id="add-student-form">
+                            <div class="form-group">
+                                <label for="student-name">Student Full Name</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-regular fa-user input-icon"></i>
+                                    <input type="text" id="student-name" placeholder="e.g. Samin Ahmed" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="student-grade">Grade (0 - 100)</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-solid fa-percent input-icon"></i>
+                                    <input type="number" id="student-grade" min="0" max="100" placeholder="e.g. 85" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fa-solid fa-plus"></i> Add Student
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Search Student Card -->
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-magnifying-glass"></i> Search Records</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="search-input">Find Student by Name</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-magnifying-glass input-icon"></i>
+                                <input type="text" id="search-input" placeholder="Type name to search...">
+                            </div>
+                        </div>
+                        <div id="search-result-container" class="search-result-box hidden">
+                            <div class="search-result-detail">
+                                <span class="result-label">Result Found:</span>
+                                <div class="result-info">
+                                    <strong id="result-name">Samin Ahmed</strong>
+                                    <span id="result-id" class="result-badge">STU-001</span>
+                                    <span id="result-grade" class="result-grade-val">Grade: 95</span>
+                                </div>
+                            </div>
+                            <div class="search-result-actions">
+                                <button id="btn-search-locate" class="btn btn-sm btn-info">
+                                    <i class="fa-solid fa-eye"></i> Focus Row
+                                </button>
+                                <button id="btn-search-clear" class="btn btn-sm btn-clear">
+                                    <i class="fa-solid fa-xmark"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Student List Table -->
+            <div class="table-panel">
+                <div class="card glass-card table-card">
+                    <div class="table-card-header">
+                        <div class="header-left">
+                            <h2><i class="fa-solid fa-list-check"></i> Student Directory</h2>
+                            <p id="table-subtitle">Displaying database records</p>
+                        </div>
+                        <div class="header-right">
+                            <div class="sort-actions">
+                                <span class="sort-label">Sort by Grade:</span>
+                                <button id="btn-sort-asc" class="btn btn-icon btn-secondary" title="Sort Ascending">
+                                    <i class="fa-solid fa-arrow-up-1-9"></i>
+                                </button>
+                                <button id="btn-sort-desc" class="btn btn-icon btn-secondary" title="Sort Descending">
+                                    <i class="fa-solid fa-arrow-down-9-1"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="students-table">
+                            <thead>
+                                <tr>
+                                    <th>Index</th>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Grade</th>
+                                    <th>Academic Status</th>
+                                    <th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="students-table-body">
+                                <!-- Dynamic JS Injection -->
+                                <tr>
+                                    <td colspan="6" class="table-loading">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading students record...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Grade Modal -->
+    <div id="edit-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal animate-scale">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-pen"></i> Update Student Grade</h3>
+                <button id="modal-close" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">Modifying record for <strong id="modal-student-name">Student</strong> (<span id="modal-student-id">STU-000</span>)</p>
+                <form id="edit-grade-form">
+                    <input type="hidden" id="edit-student-index">
+                    <div class="form-group">
+                        <label for="edit-student-grade">New Grade (0 - 100)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-percent input-icon"></i>
+                            <input type="number" id="edit-student-grade" min="0" max="100" required>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="btn-edit-cancel" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
