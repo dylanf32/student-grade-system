@@ -108,3 +108,8 @@ python -m unittest discover -s tests -v
 - **test_statistics.py** — Compute, accessors, empty-list edge cases
 - **test_validators.py** — Name, grade, index validation + boundary cases
 - **test_storage.py** — JSON roundtrip, missing file, corrupted file handling
+
+
+## License
+
+Distributed under the MIT License. See the [LICENSE](LICENSE) file for details.
