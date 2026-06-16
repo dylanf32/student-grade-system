@@ -3,6 +3,15 @@
 A **modular, scalable, and clean** console-based application for managing student grades built in Python.
 
 ---
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/status-active-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/platform-Web%20%7C%20Console-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/built%20with-Python-3776AB?logo=python&logoColor=white" alt="Built With Python">
+  <img src="https://img.shields.io/badge/framework-Flask-000000?logo=flask&logoColor=white" alt="Framework Flask">
+</p>
+
 
 ## 📂 Project Structure
 
