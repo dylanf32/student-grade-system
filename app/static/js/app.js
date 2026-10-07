@@ -37,18 +37,19 @@ function showToast(message, type = 'info') {
    GRADE STATUS HELPERS
    ========================================================================== */
 function getGradeStatus(grade) {
-    if (grade >= 90) return { label: 'Excellent', badge: 'badge-excellent', icon: '🌟' };
-    if (grade >= 80) return { label: 'Good', badge: 'badge-good', icon: '👍' };
-    if (grade >= 60) return { label: 'Average', badge: 'badge-average', icon: '📘' };
-    if (grade >= 50) return { label: 'Below Avg', badge: 'badge-below-avg', icon: '⚠️' };
-    return { label: 'Failing', badge: 'badge-failing', icon: '❌' };
+    // Thresholds mirror app/config.py: 90 Excellent, 80 Good, 70 Average, 60 Below Avg, <60 Failing
+    if (grade >= 90) return { label: 'Excellent',    badge: 'badge-excellent',  icon: '🌟' };
+    if (grade >= 80) return { label: 'Good',         badge: 'badge-good',       icon: '👍' };
+    if (grade >= 70) return { label: 'Average',      badge: 'badge-average',    icon: '📘' };
+    if (grade >= 60) return { label: 'Below Avg',    badge: 'badge-below-avg',  icon: '⚠️' };
+    return           { label: 'Failing',             badge: 'badge-failing',    icon: '❌' };
 }
 
 function getGradeColor(grade) {
     if (grade >= 90) return 'var(--success)';
     if (grade >= 80) return 'var(--info)';
-    if (grade >= 60) return 'var(--average)';
-    if (grade >= 50) return 'var(--warning)';
+    if (grade >= 70) return 'var(--average)';
+    if (grade >= 60) return 'var(--warning)';
     return 'var(--danger)';
 }
 
@@ -298,13 +299,22 @@ async function performSearch(query) {
         const data = await res.json();
 
         if (data.found) {
-            document.getElementById('result-name').textContent = data.student.name;
-            document.getElementById('result-id').textContent = data.student.id;
-            document.getElementById('result-grade').textContent = `Grade: ${data.student.grade}`;
+            // data.students contains all matches (may be > 1 for duplicate names).
+            const students = data.students;
+            const first = students[0];
+
+            // Update the visible result card with the first match summary.
+            document.getElementById('result-name').textContent = first.name;
+            document.getElementById('result-id').textContent = first.id;
+            document.getElementById('result-grade').textContent =
+                students.length === 1
+                    ? `Grade: ${first.grade}`
+                    : `${students.length} matches — grades: ${students.map(s => s.grade).join(', ')}`;
             searchResultContainer.classList.remove('hidden');
 
-            // Highlight the row in the table
-            highlightRow(data.student.index);
+            // Highlight every matching row in the table.
+            clearHighlight();
+            students.forEach(s => highlightRow(s.index));
         } else {
             searchResultContainer.classList.add('hidden');
             clearHighlight();
@@ -315,7 +325,6 @@ async function performSearch(query) {
 }
 
 function highlightRow(index) {
-    clearHighlight();
     const row = document.querySelector(`tr[data-index="${index}"]`);
     if (row) {
         row.classList.add('row-highlight');
@@ -328,6 +337,7 @@ function clearHighlight() {
 }
 
 document.getElementById('btn-search-locate').addEventListener('click', () => {
+    clearHighlight();
     const name = document.getElementById('result-name').textContent;
     const rows = document.querySelectorAll('#students-table-body tr');
     rows.forEach(row => {

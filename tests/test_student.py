@@ -88,12 +88,23 @@ class TestStudentSerialization(unittest.TestCase):
 
 
 class TestStudentEquality(unittest.TestCase):
-    """Tests for __eq__."""
+    """Tests for __eq__.
 
-    def test_equal_students(self):
+    Students are equal iff they share the same UUID.  Two independently
+    created students with identical name/grade are distinct entities.
+    """
+
+    def test_equal_students_same_uuid(self):
+        """A student round-tripped through to_dict/from_dict must be equal."""
+        a = Student("Ali", 80)
+        b = Student.from_dict(a.to_dict())
+        self.assertEqual(a, b)
+
+    def test_different_uuid_not_equal(self):
+        """Two freshly created students with the same name/grade differ."""
         a = Student("Ali", 80)
         b = Student("Ali", 80)
-        self.assertEqual(a, b)
+        self.assertNotEqual(a, b)
 
     def test_different_students(self):
         a = Student("Ali", 80)

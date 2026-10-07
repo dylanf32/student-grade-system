@@ -5,6 +5,8 @@ These are the ONLY functions that call ``input()``.
 The rest of the app never reads stdin directly.
 """
 
+import math
+
 from app.ui.colors import Colors
 
 
@@ -26,7 +28,46 @@ class InputHelper:
             try:
                 return int(input(f"  {C.INDIGO}{C.BOLD}▸{C.END} {C.WHITE}{prompt}{C.END}"))
             except ValueError:
-                print(f"  {C.BG_RED}{C.WHITE}{C.BOLD} ✘ {C.END} {C.RED}Please enter a valid number.{C.END}")
+                print(f"  {C.BG_RED}{C.WHITE}{C.BOLD} ✘ {C.END} {C.RED}Please enter a valid whole number.{C.END}")
+
+    @staticmethod
+    def get_grade(prompt: str) -> float:
+        """Repeatedly prompts until a valid grade (0–100) is entered.
+
+        Accepts decimals (e.g. 85.5).  Rejects anything that is not a
+        finite number in [0, 100], including text, booleans, NaN, and
+        infinity representations.
+
+        Args:
+            prompt: The message shown to the user.
+
+        Returns:
+            A valid numeric grade as float.
+        """
+        C = Colors
+        while True:
+            raw = input(f"  {C.INDIGO}{C.BOLD}▸{C.END} {C.WHITE}{prompt}{C.END}").strip()
+            try:
+                value = float(raw)
+            except ValueError:
+                print(
+                    f"  {C.BG_RED}{C.WHITE}{C.BOLD} ✘ {C.END} "
+                    f"{C.RED}Please enter a valid number (e.g. 85 or 85.5).{C.END}"
+                )
+                continue
+            if math.isnan(value) or math.isinf(value):
+                print(
+                    f"  {C.BG_RED}{C.WHITE}{C.BOLD} ✘ {C.END} "
+                    f"{C.RED}Grade must be a finite number.{C.END}"
+                )
+                continue
+            if value < 0 or value > 100:
+                print(
+                    f"  {C.BG_RED}{C.WHITE}{C.BOLD} ✘ {C.END} "
+                    f"{C.RED}Grade must be between 0 and 100.{C.END}"
+                )
+                continue
+            return value
 
     @staticmethod
     def get_str(prompt: str) -> str:

@@ -21,16 +21,16 @@ class GradeStats:
     Attributes:
         total_students: Number of students.
         average:        Mean grade (rounded to 2 decimals).
-        highest:        Maximum grade.
-        lowest:         Minimum grade.
+        highest:        Maximum grade (float to support decimal grades).
+        lowest:         Minimum grade (float to support decimal grades).
         passing_count:  Students with grade >= 60.
         failing_count:  Students with grade < 60.
     """
 
     total_students: int
     average: float
-    highest: int
-    lowest: int
+    highest: float
+    lowest: float
     passing_count: int
     failing_count: int
 
@@ -88,12 +88,12 @@ class StatisticsService:
         return round(sum(s.grade for s in students) / len(students), 2)
 
     @staticmethod
-    def get_highest(students: List[Student]) -> int:
+    def get_highest(students: List[Student]) -> float:
         """Returns the highest grade, or 0 if empty."""
         return max((s.grade for s in students), default=0)
 
     @staticmethod
-    def get_lowest(students: List[Student]) -> int:
+    def get_lowest(students: List[Student]) -> float:
         """Returns the lowest grade, or 0 if empty."""
         return min((s.grade for s in students), default=0)
 

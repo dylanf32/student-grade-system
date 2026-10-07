@@ -144,8 +144,12 @@ class StudentManager:
     def search_by_name(self, name: str) -> int:
         """Case-insensitive search by student name.
 
+        Returns the index of the **first** match for backward compatibility
+        with callers that expect a single-integer result.  Use
+        ``search_all_by_name`` when you need all matches.
+
         Args:
-            name: The name to look for.
+            name: The name to look for (leading/trailing whitespace ignored).
 
         Returns:
             Index of the first match, or -1 if not found.
@@ -155,6 +159,27 @@ class StudentManager:
             if student.name.lower() == target:
                 return i
         return -1
+
+    def search_all_by_name(self, name: str) -> list:
+        """Case-insensitive search returning ALL matching students.
+
+        Because names are not unique identifiers, multiple students may
+        share the same name.  This method returns every match so callers
+        can present all of them for the user to choose from.
+
+        Args:
+            name: The name to look for (leading/trailing whitespace ignored).
+
+        Returns:
+            List of ``(index, student)`` tuples for all exact matches,
+            ordered by their position in the list.  Empty list if none found.
+        """
+        target = name.strip().lower()
+        return [
+            (i, s)
+            for i, s in enumerate(self._students)
+            if s.name.lower() == target
+        ]
 
     # ═══════════════════════════════════════════════════════════════════════
     #  Sort

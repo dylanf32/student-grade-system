@@ -27,7 +27,7 @@ class MenuHandler:
         Display.section_header("Add New Student", "➕", Colors.GREEN)
 
         name  = InputHelper.get_str("Enter student name: ")
-        grade = InputHelper.get_int("Enter grade (0-100): ")
+        grade = InputHelper.get_grade("Enter grade (0-100): ")
 
         try:
             student = manager.add_student(name, grade)
@@ -74,7 +74,7 @@ class MenuHandler:
 
         Display.student_table(manager.get_all_students())
         index     = InputHelper.get_int("Enter index of student to update: ")
-        new_grade = InputHelper.get_int("Enter new grade (0-100): ")
+        new_grade = InputHelper.get_grade("Enter new grade (0-100): ")
 
         try:
             updated = manager.update_grade(index, new_grade)
@@ -94,31 +94,37 @@ class MenuHandler:
 
     @staticmethod
     def search(manager: StudentManager) -> None:
-        """Prompts for a name and shows the matching student."""
+        """Prompts for a name and shows all matching students.
+
+        Multiple students may share the same name; all matches are shown,
+        each identified by their stable UUID so the user can select the
+        correct one by index for further operations.
+        """
         Display.section_header("Search Student", "🔍", Colors.LAVENDER)
 
         if manager.is_empty():
             Display.warn("No students in the system.")
             return
 
-        name  = InputHelper.get_str("Enter name to search: ")
-        index = manager.search_by_name(name)
+        name    = InputHelper.get_str("Enter name to search: ")
+        matches = manager.search_all_by_name(name)
 
         C = Colors
-        if index == -1:
+        if not matches:
             Display.error(f"Student '{name}' not found.")
         else:
-            student = manager.get_student(index)
-            student_id = Display._format_id(index)
             print()
-            print(f"  {C.DIM}┌{'─' * 44}┐{C.END}")
-            print(f"  {C.DIM}│{C.END}  {C.GOLD}{C.BOLD}🎯 Match Found{C.END}")
-            print(f"  {C.DIM}│{C.END}  {C.DIM}ID:{C.END}    {C.WHITE}{student_id}{C.END}")
-            print(f"  {C.DIM}│{C.END}  {C.DIM}Index:{C.END} {C.WHITE}{C.BOLD}{index}{C.END}")
-            print(f"  {C.DIM}│{C.END}  {C.DIM}Name:{C.END}  {C.WHITE}{C.BOLD}{student.name}{C.END}")
-            color, status, _, _ = Display._grade_badge(student.grade)
-            print(f"  {C.DIM}│{C.END}  {C.DIM}Grade:{C.END} {color}{C.BOLD}{student.grade}{C.END}  {C.DIM}({status}){C.END}")
-            print(f"  {C.DIM}└{'─' * 44}┘{C.END}")
+            print(f"  {C.GOLD}{C.BOLD}🎯 {len(matches)} match(es) found for '{name}':{C.END}")
+            for index, student in matches:
+                student_display_id = Display._format_id(index)
+                color, status, _, _ = Display._grade_badge(student.grade)
+                print(f"  {C.DIM}┌{'─' * 44}┐{C.END}")
+                print(f"  {C.DIM}│{C.END}  {C.DIM}UUID:{C.END}  {C.DIM}{student.id}{C.END}")
+                print(f"  {C.DIM}│{C.END}  {C.DIM}ID:{C.END}    {C.WHITE}{student_display_id}{C.END}")
+                print(f"  {C.DIM}│{C.END}  {C.DIM}Index:{C.END} {C.WHITE}{C.BOLD}{index}{C.END}")
+                print(f"  {C.DIM}│{C.END}  {C.DIM}Name:{C.END}  {C.WHITE}{C.BOLD}{student.name}{C.END}")
+                print(f"  {C.DIM}│{C.END}  {C.DIM}Grade:{C.END} {color}{C.BOLD}{student.grade}{C.END}  {C.DIM}({status}){C.END}")
+                print(f"  {C.DIM}└{'─' * 44}┘{C.END}")
 
     # ── 6. Statistics ────────────────────────────────────────────────────
 

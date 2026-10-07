@@ -144,26 +144,38 @@ def get_stats():
 
 @app.route('/api/search', methods=['GET'])
 def search_student():
-    """Search for a student by name (case-insensitive)."""
+    """Search for students by name (case-insensitive, returns all matches).
+
+    Because names are not unique, this endpoint returns a list of all
+    students whose name exactly matches the query (case-insensitive,
+    trimmed).  The legacy ``found``/``student`` shape is preserved for
+    single-match responses; multi-match responses use ``students``.
+    """
     name = request.args.get("name", "").strip()
     if not name:
         return jsonify({"success": False, "error": "Name query parameter is required."}), 400
-        
-    index = manager.search_by_name(name)
-    if index != -1:
-        s = manager.get_student(index)
-        return jsonify({
-            "found": True,
-            "index": index,
-            "student": {
-                "index": index,
-                "student_id": s.id,
-                "id": f"STU-{index+1:03d}",
-                "name": s.name,
-                "grade": s.grade
-            }
-        })
-    return jsonify({"found": False})
+
+    matches = manager.search_all_by_name(name)
+    if not matches:
+        return jsonify({"found": False, "students": []})
+
+    students_payload = [
+        {
+            "index": i,
+            "student_id": s.id,
+            "id": f"STU-{i+1:03d}",
+            "name": s.name,
+            "grade": s.grade,
+        }
+        for i, s in matches
+    ]
+    return jsonify({
+        "found": True,
+        "students": students_payload,
+        # Backward-compatible single-match fields (first result)
+        "index": students_payload[0]["index"],
+        "student": students_payload[0],
+    })
 
 @app.route('/api/sort', methods=['GET'])
 def sort_students():

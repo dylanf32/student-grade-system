@@ -5,6 +5,7 @@ Centralizes all validation logic so that both the service layer
 and the UI layer can reuse the same rules without duplication.
 """
 
+import math
 from typing import Tuple
 
 from app.config import MIN_GRADE, MAX_GRADE
@@ -33,8 +34,11 @@ class InputValidator:
         return True, ""
 
     @staticmethod
-    def validate_grade(grade: int) -> Tuple[bool, str]:
+    def validate_grade(grade: float) -> Tuple[bool, str]:
         """Validates a grade value.
+
+        Accepts int or float in [MIN_GRADE, MAX_GRADE].
+        Rejects booleans, NaN, and infinity.
 
         Args:
             grade: The numeric grade to validate.
@@ -42,8 +46,10 @@ class InputValidator:
         Returns:
             Tuple of (is_valid, error_message).
         """
-        if not isinstance(grade, (int, float)):
+        if isinstance(grade, bool) or not isinstance(grade, (int, float)):
             return False, "Grade must be a number."
+        if math.isnan(grade) or math.isinf(grade):
+            return False, "Grade must be a finite number."
         if grade < MIN_GRADE or grade > MAX_GRADE:
             return False, f"Grade must be between {MIN_GRADE} and {MAX_GRADE}."
         return True, ""
