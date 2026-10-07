@@ -10,27 +10,23 @@ handled by the UI layer.
 from __future__ import annotations
 
 import threading
-from typing import List
+from typing import List, Optional, Tuple
 
-from app.models.student import Student
+from app.models.student import Student, CourseGrade
 from app.storage.base_storage import BaseStorage
 from app.validators.input_validator import InputValidator
 
 
 class StudentManager:
-    """Manages a collection of Students with CRUD, search, and sort.
+    """Manages a collection of Students with CRUD, search, sort, and filter.
 
     Attributes:
         _students (List[Student]): In-memory list of students.
         _storage  (BaseStorage):   Injected persistence backend.
+        _lock     (threading.Lock): Guards concurrent access.
     """
 
     def __init__(self, storage: BaseStorage) -> None:
-        """Initialize the manager with a storage backend.
-
-        Args:
-            storage: Any concrete implementation of BaseStorage.
-        """
         self._students: List[Student] = []
         self._storage: BaseStorage = storage
         self._lock: threading.Lock = threading.Lock()
@@ -39,12 +35,28 @@ class StudentManager:
     #  CRUD — Create
     # ═══════════════════════════════════════════════════════════════════════
 
-    def add_student(self, name: str, grade: int) -> Student:
+    def add_student(
+        self,
+        name: str,
+        grade: float,
+        email: str = "",
+        major: str = "",
+        academic_year: str = "",
+        gpa: Optional[float] = None,
+        courses: Optional[List[CourseGrade]] = None,
+        notes: str = "",
+    ) -> Student:
         """Creates and appends a new Student.
 
         Args:
-            name:  Student name (validated).
-            grade: Student grade (validated).
+            name:          Student name (validated).
+            grade:         Student overall grade (validated).
+            email:         Contact email (optional).
+            major:         Program/major (optional).
+            academic_year: Year string e.g. "Freshman" (optional).
+            gpa:           Cumulative GPA 0–4 (optional).
+            courses:       List of CourseGrade objects (optional).
+            notes:         Free-text notes (optional).
 
         Returns:
             The newly created Student object.
@@ -60,7 +72,16 @@ class StudentManager:
         if not valid:
             raise ValueError(msg)
 
-        student = Student(name, grade)
+        student = Student(
+            name=name,
+            grade=grade,
+            email=email,
+            major=major,
+            academic_year=academic_year,
+            gpa=gpa,
+            courses=courses,
+            notes=notes,
+        )
         with self._lock:
             self._students.append(student)
         return student
@@ -75,9 +96,6 @@ class StudentManager:
         Args:
             index: 0-based index.
 
-        Returns:
-            Student object.
-
         Raises:
             ValueError: If index is invalid.
         """
@@ -86,12 +104,16 @@ class StudentManager:
             raise ValueError(msg)
         return self._students[index]
 
-    def get_all_students(self) -> List[Student]:
-        """Returns a shallow copy of the student list.
+    def get_by_id(self, student_id: str) -> Optional[Student]:
+        """Returns the student with the given UUID, or None if not found."""
+        with self._lock:
+            for s in self._students:
+                if s.id == student_id:
+                    return s
+        return None
 
-        Returns:
-            List of Student objects.
-        """
+    def get_all_students(self) -> List[Student]:
+        """Returns a shallow copy of the student list."""
         with self._lock:
             return list(self._students)
 
@@ -99,15 +121,8 @@ class StudentManager:
     #  CRUD — Update
     # ═══════════════════════════════════════════════════════════════════════
 
-    def update_grade(self, index: int, new_grade: int) -> Student:
+    def update_grade(self, index: int, new_grade: float) -> Student:
         """Updates the grade of the student at ``index``.
-
-        Args:
-            index:     0-based index of the target student.
-            new_grade: New grade value.
-
-        Returns:
-            The updated Student object.
 
         Raises:
             ValueError: If index or grade is invalid.
@@ -123,18 +138,54 @@ class StudentManager:
             self._students[index].grade = new_grade
             return self._students[index]
 
+    def update_student(self, student_id: str, **fields) -> Student:
+        """Updates arbitrary fields of a student identified by UUID.
+
+        Supported fields: grade, email, major, academic_year, gpa, courses, notes.
+        Fields not provided are left unchanged.
+
+        Args:
+            student_id: Stable UUID of the target student.
+            **fields:   Keyword arguments for fields to update.
+
+        Returns:
+            The updated Student.
+
+        Raises:
+            ValueError: If the student is not found or a field value is invalid.
+        """
+        with self._lock:
+            student = next((s for s in self._students if s.id == student_id), None)
+            if student is None:
+                raise ValueError("Student not found.")
+
+            if "grade" in fields:
+                valid, msg = InputValidator.validate_grade(fields["grade"])
+                if not valid:
+                    raise ValueError(msg)
+                student.grade = fields["grade"]
+
+            if "email" in fields:
+                student.email = fields["email"]
+            if "major" in fields:
+                student.major = fields["major"]
+            if "academic_year" in fields:
+                student.academic_year = fields["academic_year"]
+            if "gpa" in fields:
+                student.gpa = fields["gpa"]  # setter validates
+            if "courses" in fields:
+                student.courses = fields["courses"]
+            if "notes" in fields:
+                student.notes = fields["notes"]
+
+            return student
+
     # ═══════════════════════════════════════════════════════════════════════
     #  CRUD — Delete
     # ═══════════════════════════════════════════════════════════════════════
 
     def remove_student(self, index: int) -> Student:
         """Removes and returns the student at ``index``.
-
-        Args:
-            index: 0-based index of the student to remove.
-
-        Returns:
-            The removed Student object.
 
         Raises:
             ValueError: If index is invalid.
@@ -146,21 +197,14 @@ class StudentManager:
             return self._students.pop(index)
 
     # ═══════════════════════════════════════════════════════════════════════
-    #  Search
+    #  Search & Filter
     # ═══════════════════════════════════════════════════════════════════════
 
     def search_by_name(self, name: str) -> int:
         """Case-insensitive search by student name.
 
-        Returns the index of the **first** match for backward compatibility
-        with callers that expect a single-integer result.  Use
-        ``search_all_by_name`` when you need all matches.
-
-        Args:
-            name: The name to look for (leading/trailing whitespace ignored).
-
-        Returns:
-            Index of the first match, or -1 if not found.
+        Returns the index of the **first** match, or -1 if not found.
+        Use ``search_all_by_name`` when you need all matches.
         """
         target = name.strip().lower()
         with self._lock:
@@ -169,19 +213,11 @@ class StudentManager:
                     return i
         return -1
 
-    def search_all_by_name(self, name: str) -> list:
+    def search_all_by_name(self, name: str) -> List[Tuple[int, Student]]:
         """Case-insensitive search returning ALL matching students.
 
-        Because names are not unique identifiers, multiple students may
-        share the same name.  This method returns every match so callers
-        can present all of them for the user to choose from.
-
-        Args:
-            name: The name to look for (leading/trailing whitespace ignored).
-
         Returns:
-            List of ``(index, student)`` tuples for all exact matches,
-            ordered by their position in the list.  Empty list if none found.
+            List of ``(index, student)`` tuples for all exact matches.
         """
         target = name.strip().lower()
         with self._lock:
@@ -191,6 +227,38 @@ class StudentManager:
                 if s.name.lower() == target
             ]
 
+    def filter_students(
+        self,
+        name: str = "",
+        major: str = "",
+        academic_year: str = "",
+        standing: str = "",
+        min_grade: Optional[float] = None,
+        max_grade: Optional[float] = None,
+    ) -> List[Tuple[int, Student]]:
+        """Returns (index, student) pairs matching all supplied filters.
+
+        All filters are optional and case-insensitive substring matches
+        except min_grade / max_grade which are numeric bounds.
+        """
+        with self._lock:
+            results = []
+            for i, s in enumerate(self._students):
+                if name and name.strip().lower() not in s.name.lower():
+                    continue
+                if major and major.strip().lower() not in s.major.lower():
+                    continue
+                if academic_year and academic_year.strip().lower() not in s.academic_year.lower():
+                    continue
+                if standing and standing.strip().lower() not in s.academic_standing().lower():
+                    continue
+                if min_grade is not None and s.grade < min_grade:
+                    continue
+                if max_grade is not None and s.grade > max_grade:
+                    continue
+                results.append((i, s))
+        return results
+
     # ═══════════════════════════════════════════════════════════════════════
     #  Sort
     # ═══════════════════════════════════════════════════════════════════════
@@ -198,17 +266,11 @@ class StudentManager:
     def sort_by_grade(self, ascending: bool = True) -> List[Student]:
         """Sorts the internal list by grade (in-place).
 
-        Args:
-            ascending: True for low→high, False for high→low.
-
         Returns:
             The sorted list (same reference).
         """
         with self._lock:
-            self._students.sort(
-                key=lambda s: s.grade,
-                reverse=not ascending,
-            )
+            self._students.sort(key=lambda s: s.grade, reverse=not ascending)
             return self._students
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -230,11 +292,7 @@ class StudentManager:
     # ═══════════════════════════════════════════════════════════════════════
 
     def save(self) -> bool:
-        """Persists current data via the storage backend.
-
-        Returns:
-            True on success.
-        """
+        """Persists current data via the storage backend."""
         with self._lock:
             snapshot = list(self._students)
         return self._storage.save(snapshot)

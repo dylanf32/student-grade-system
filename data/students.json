@@ -1,37 +1,107 @@
 [
     {
+        "id": "94150d56-50de-4d53-b0c8-214a6838dc05",
         "name": "affan",
         "grade": 92,
-        "id": "94150d56-50de-4d53-b0c8-214a6838dc05"
+        "email": "affan@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Junior",
+        "gpa": null,
+        "courses": [
+            {"course": "Data Structures", "grade": 94},
+            {"course": "Algorithms", "grade": 90},
+            {"course": "Operating Systems", "grade": 92}
+        ],
+        "notes": "Strong performance across all modules."
     },
     {
+        "id": "a12c6c23-d228-4284-ac74-1b2112622dac",
         "name": "ezaz",
         "grade": 88,
-        "id": "a12c6c23-d228-4284-ac74-1b2112622dac"
+        "email": "ezaz@university.edu",
+        "major": "Software Engineering",
+        "academic_year": "Sophomore",
+        "gpa": null,
+        "courses": [
+            {"course": "Web Development", "grade": 91},
+            {"course": "Database Systems", "grade": 85},
+            {"course": "Software Design", "grade": 88}
+        ],
+        "notes": ""
     },
     {
+        "id": "ca46261b-a668-47c2-ae9c-cdd68196147a",
         "name": "samin",
         "grade": 77,
-        "id": "ca46261b-a668-47c2-ae9c-cdd68196147a"
+        "email": "samin@university.edu",
+        "major": "Information Systems",
+        "academic_year": "Sophomore",
+        "gpa": null,
+        "courses": [
+            {"course": "Networks", "grade": 79},
+            {"course": "Statistics", "grade": 75},
+            {"course": "Systems Analysis", "grade": 77}
+        ],
+        "notes": ""
     },
     {
+        "id": "abc3d99e-2610-4d3f-bea7-4a50daacd327",
         "name": "noor",
         "grade": 76,
-        "id": "abc3d99e-2610-4d3f-bea7-4a50daacd327"
+        "email": "noor@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Freshman",
+        "gpa": null,
+        "courses": [
+            {"course": "Introduction to Programming", "grade": 80},
+            {"course": "Mathematics I", "grade": 72},
+            {"course": "Digital Logic", "grade": 76}
+        ],
+        "notes": "Good potential, needs to improve maths foundation."
     },
     {
+        "id": "25dfec46-b6bc-4b0e-af16-b315bc3640b6",
         "name": "huzaifa",
         "grade": 57,
-        "id": "25dfec46-b6bc-4b0e-af16-b315bc3640b6"
+        "email": "huzaifa@university.edu",
+        "major": "Information Technology",
+        "academic_year": "Freshman",
+        "gpa": null,
+        "courses": [
+            {"course": "Introduction to Programming", "grade": 60},
+            {"course": "Mathematics I", "grade": 54},
+            {"course": "Technical Writing", "grade": 57}
+        ],
+        "notes": "At risk — recommended for academic support sessions."
     },
     {
+        "id": "2a35295f-b30f-4eaa-9de8-72fcdd07776e",
         "name": "daniyal",
         "grade": 45,
-        "id": "2a35295f-b30f-4eaa-9de8-72fcdd07776e"
+        "email": "daniyal@university.edu",
+        "major": "Information Technology",
+        "academic_year": "Freshman",
+        "gpa": null,
+        "courses": [
+            {"course": "Introduction to Programming", "grade": 48},
+            {"course": "Mathematics I", "grade": 42},
+            {"course": "Technical Writing", "grade": 45}
+        ],
+        "notes": "Academic probation. Mandatory tutoring required."
     },
     {
+        "id": "97de4b81-d6cf-44ce-93d4-76be29b01111",
         "name": "ahmed",
         "grade": 66,
-        "id": "97de4b81-d6cf-44ce-93d4-76be29b01111"
+        "email": "ahmed@university.edu",
+        "major": "Software Engineering",
+        "academic_year": "Junior",
+        "gpa": null,
+        "courses": [
+            {"course": "Software Testing", "grade": 70},
+            {"course": "Project Management", "grade": 63},
+            {"course": "Software Design", "grade": 65}
+        ],
+        "notes": ""
     }
 ]

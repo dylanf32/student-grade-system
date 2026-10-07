@@ -8,20 +8,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome for Premium Icons -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Main Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="app-container">
-        <!-- Dashboard Header -->
+
+        <!-- ── Header ─────────────────────────────────────────────────── -->
         <header class="app-header">
             <div class="header-logo">
                 <i class="fa-solid fa-graduation-cap header-icon"></i>
                 <div class="header-title-wrapper">
                     <h1>Student Grade System</h1>
-                    <p class="header-subtitle">Academic Performance Control Center</p>
+                    <p class="header-subtitle">Academic Performance Control Centre</p>
                 </div>
             </div>
             <div class="header-actions">
@@ -35,53 +36,38 @@
             </div>
         </header>
 
-        <!-- Statistics Overview Grid -->
+        <!-- ── Stats Grid ──────────────────────────────────────────────── -->
         <section class="stats-grid">
-            <!-- Total Students -->
             <div class="stat-card">
-                <div class="stat-icon icon-blue">
-                    <i class="fa-solid fa-users"></i>
-                </div>
+                <div class="stat-icon icon-blue"><i class="fa-solid fa-users"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Total Students</span>
                     <h3 id="stat-total" class="stat-value">0</h3>
                 </div>
             </div>
-            <!-- Average Grade -->
             <div class="stat-card">
-                <div class="stat-icon icon-purple">
-                    <i class="fa-solid fa-chart-line"></i>
-                </div>
+                <div class="stat-icon icon-purple"><i class="fa-solid fa-chart-line"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Class Average</span>
                     <h3 id="stat-average" class="stat-value">0.0</h3>
                 </div>
             </div>
-            <!-- Highest Grade -->
             <div class="stat-card">
-                <div class="stat-icon icon-green">
-                    <i class="fa-solid fa-award"></i>
+                <div class="stat-icon icon-amber"><i class="fa-solid fa-star-half-stroke"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Avg GPA</span>
+                    <h3 id="stat-avg-gpa" class="stat-value">—</h3>
                 </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon icon-green"><i class="fa-solid fa-award"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Highest Grade</span>
                     <h3 id="stat-highest" class="stat-value">0</h3>
                 </div>
             </div>
-            <!-- Lowest Grade -->
             <div class="stat-card">
-                <div class="stat-icon icon-red">
-                    <i class="fa-solid fa-arrow-down-short-wide"></i>
-                </div>
-                <div class="stat-content">
-                    <span class="stat-label">Lowest Grade</span>
-                    <h3 id="stat-lowest" class="stat-value">0</h3>
-                </div>
-            </div>
-            <!-- Passing Rate -->
-            <div class="stat-card">
-                <div class="stat-icon icon-teal">
-                    <i class="fa-solid fa-circle-check"></i>
-                </div>
+                <div class="stat-icon icon-teal"><i class="fa-solid fa-circle-check"></i></div>
                 <div class="stat-content">
                     <span class="stat-label">Passing Rate</span>
                     <h3 id="stat-pass-rate" class="stat-value">0%</h3>
@@ -89,10 +75,12 @@
             </div>
         </section>
 
-        <!-- Main Dashboard Workspace -->
+        <!-- ── Main Workspace ──────────────────────────────────────────── -->
         <main class="dashboard-main">
-            <!-- Left Panel: Controls & Input -->
+
+            <!-- Left Panel: Controls -->
             <div class="control-panel">
+
                 <!-- Add Student Card -->
                 <div class="card glass-card">
                     <div class="card-header">
@@ -100,19 +88,76 @@
                     </div>
                     <div class="card-body">
                         <form id="add-student-form">
-                            <div class="form-group">
-                                <label for="student-name">Student Full Name</label>
-                                <div class="input-wrapper">
-                                    <i class="fa-regular fa-user input-icon"></i>
-                                    <input type="text" id="student-name" placeholder="e.g. Samin Ahmed" required>
+                            <!-- Row 1 -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="student-name">Full Name <span class="req">*</span></label>
+                                    <div class="input-wrapper">
+                                        <i class="fa-regular fa-user input-icon"></i>
+                                        <input type="text" id="student-name" placeholder="e.g. Samin Ahmed" required>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="student-grade">Grade (0–100) <span class="req">*</span></label>
+                                    <div class="input-wrapper">
+                                        <i class="fa-solid fa-percent input-icon"></i>
+                                        <input type="number" id="student-grade" min="0" max="100" step="0.1" placeholder="e.g. 85" required>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label for="student-grade">Grade (0 - 100)</label>
-                                <div class="input-wrapper">
-                                    <i class="fa-solid fa-percent input-icon"></i>
-                                    <input type="number" id="student-grade" min="0" max="100" placeholder="e.g. 85" required>
+                            <!-- Row 2 -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="student-email">Email</label>
+                                    <div class="input-wrapper">
+                                        <i class="fa-solid fa-envelope input-icon"></i>
+                                        <input type="email" id="student-email" placeholder="student@uni.edu">
+                                    </div>
                                 </div>
+                                <div class="form-group">
+                                    <label for="student-major">Major / Program</label>
+                                    <div class="input-wrapper">
+                                        <i class="fa-solid fa-book input-icon"></i>
+                                        <input type="text" id="student-major" placeholder="e.g. Computer Science">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Row 3 -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="student-year">Academic Year</label>
+                                    <div class="input-wrapper select-wrapper">
+                                        <i class="fa-solid fa-calendar-days input-icon"></i>
+                                        <select id="student-year">
+                                            <option value="">— Select Year —</option>
+                                            <option value="Freshman">Freshman</option>
+                                            <option value="Sophomore">Sophomore</option>
+                                            <option value="Junior">Junior</option>
+                                            <option value="Senior">Senior</option>
+                                            <option value="Graduate">Graduate</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="student-gpa">GPA (0.0–4.0)</label>
+                                    <div class="input-wrapper">
+                                        <i class="fa-solid fa-medal input-icon"></i>
+                                        <input type="number" id="student-gpa" min="0" max="4" step="0.01" placeholder="e.g. 3.50">
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Courses -->
+                            <div class="form-group">
+                                <label>Enrolled Courses</label>
+                                <div id="add-courses-list" class="courses-list"></div>
+                                <button type="button" id="btn-add-course" class="btn btn-sm btn-ghost mt-sm">
+                                    <i class="fa-solid fa-plus"></i> Add Course
+                                </button>
+                            </div>
+                            <!-- Notes -->
+                            <div class="form-group">
+                                <label for="student-notes">Academic Notes</label>
+                                <textarea id="student-notes" rows="2" placeholder="Optional notes about this student…"></textarea>
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">
                                 <i class="fa-solid fa-plus"></i> Add Student
@@ -121,26 +166,84 @@
                     </div>
                 </div>
 
-                <!-- Search Student Card -->
+                <!-- Search & Filter Card -->
                 <div class="card glass-card">
                     <div class="card-header">
-                        <h2><i class="fa-solid fa-magnifying-glass"></i> Search Records</h2>
+                        <h2><i class="fa-solid fa-filter"></i> Search &amp; Filter</h2>
                     </div>
                     <div class="card-body">
+                        <!-- Live name search -->
                         <div class="form-group">
-                            <label for="search-input">Find Student by Name</label>
+                            <label for="search-input">Search by Name</label>
                             <div class="input-wrapper">
                                 <i class="fa-solid fa-magnifying-glass input-icon"></i>
-                                <input type="text" id="search-input" placeholder="Type name to search...">
+                                <input type="text" id="search-input" placeholder="Type to search…">
                             </div>
                         </div>
+                        <!-- Filter row -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="filter-major">Major</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-solid fa-book input-icon"></i>
+                                    <input type="text" id="filter-major" placeholder="Any major">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="filter-year">Year</label>
+                                <div class="input-wrapper select-wrapper">
+                                    <i class="fa-solid fa-calendar-days input-icon"></i>
+                                    <select id="filter-year">
+                                        <option value="">Any</option>
+                                        <option value="Freshman">Freshman</option>
+                                        <option value="Sophomore">Sophomore</option>
+                                        <option value="Junior">Junior</option>
+                                        <option value="Senior">Senior</option>
+                                        <option value="Graduate">Graduate</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="filter-standing">Standing</label>
+                                <div class="input-wrapper select-wrapper">
+                                    <i class="fa-solid fa-chart-bar input-icon"></i>
+                                    <select id="filter-standing">
+                                        <option value="">Any</option>
+                                        <option value="Dean's List">Dean's List</option>
+                                        <option value="Good Standing">Good Standing</option>
+                                        <option value="Satisfactory">Satisfactory</option>
+                                        <option value="Academic Warning">Academic Warning</option>
+                                        <option value="Academic Probation">Academic Probation</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="filter-min-grade">Min Grade</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-solid fa-arrow-down input-icon"></i>
+                                    <input type="number" id="filter-min-grade" min="0" max="100" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="btn-apply-filter" class="btn btn-primary">
+                                <i class="fa-solid fa-filter"></i> Apply
+                            </button>
+                            <button id="btn-clear-filter" class="btn btn-secondary">
+                                <i class="fa-solid fa-xmark"></i> Clear
+                            </button>
+                        </div>
+
+                        <!-- Search result banner -->
                         <div id="search-result-container" class="search-result-box hidden">
                             <div class="search-result-detail">
                                 <span class="result-label">Result Found:</span>
                                 <div class="result-info">
-                                    <strong id="result-name">Samin Ahmed</strong>
-                                    <span id="result-id" class="result-badge">STU-001</span>
-                                    <span id="result-grade" class="result-grade-val">Grade: 95</span>
+                                    <strong id="result-name"></strong>
+                                    <span id="result-id" class="result-badge"></span>
+                                    <span id="result-grade" class="result-grade-val"></span>
                                 </div>
                             </div>
                             <div class="search-result-actions">
@@ -156,7 +259,7 @@
                 </div>
             </div>
 
-            <!-- Right Panel: Student List Table -->
+            <!-- Right Panel: Student Table -->
             <div class="table-panel">
                 <div class="card glass-card table-card">
                     <div class="table-card-header">
@@ -166,11 +269,11 @@
                         </div>
                         <div class="header-right">
                             <div class="sort-actions">
-                                <span class="sort-label">Sort by Grade:</span>
-                                <button id="btn-sort-asc" class="btn btn-icon btn-secondary" title="Sort Ascending">
+                                <span class="sort-label">Sort:</span>
+                                <button id="btn-sort-asc" class="btn btn-icon btn-secondary" title="Sort Ascending (Low → High)">
                                     <i class="fa-solid fa-arrow-up-1-9"></i>
                                 </button>
-                                <button id="btn-sort-desc" class="btn btn-icon btn-secondary" title="Sort Descending">
+                                <button id="btn-sort-desc" class="btn btn-icon btn-secondary" title="Sort Descending (High → Low)">
                                     <i class="fa-solid fa-arrow-down-9-1"></i>
                                 </button>
                             </div>
@@ -180,19 +283,21 @@
                         <table class="students-table">
                             <thead>
                                 <tr>
-                                    <th>Index</th>
-                                    <th>Student ID</th>
-                                    <th>Name</th>
+                                    <th>#</th>
+                                    <th>ID</th>
+                                    <th>Name / Email</th>
+                                    <th>Major</th>
+                                    <th>Year</th>
                                     <th>Grade</th>
-                                    <th>Academic Status</th>
+                                    <th>GPA</th>
+                                    <th>Standing</th>
                                     <th class="text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="students-table-body">
-                                <!-- Dynamic JS Injection -->
                                 <tr>
-                                    <td colspan="6" class="table-loading">
-                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading students record...
+                                    <td colspan="9" class="table-loading">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading student records…
                                     </td>
                                 </tr>
                             </tbody>
@@ -203,23 +308,80 @@
         </main>
     </div>
 
-    <!-- Edit Grade Modal -->
+    <!-- ── Edit Student Modal ───────────────────────────────────────────── -->
     <div id="edit-modal" class="modal-overlay hidden">
         <div class="modal glass-modal animate-scale">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-user-pen"></i> Update Student Grade</h3>
+                <h3><i class="fa-solid fa-user-pen"></i> Edit Student Record</h3>
                 <button id="modal-close" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
-                <p class="modal-desc">Modifying record for <strong id="modal-student-name">Student</strong> (<span id="modal-student-id">STU-000</span>)</p>
+                <p class="modal-desc">Editing: <strong id="modal-student-name">Student</strong> &nbsp;<span id="modal-student-id" class="result-badge"></span></p>
                 <form id="edit-grade-form">
                     <input type="hidden" id="edit-student-id">
-                    <div class="form-group">
-                        <label for="edit-student-grade">New Grade (0 - 100)</label>
-                        <div class="input-wrapper">
-                            <i class="fa-solid fa-percent input-icon"></i>
-                            <input type="number" id="edit-student-grade" min="0" max="100" required>
+                    <!-- Row 1 -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-student-grade">Grade (0–100) <span class="req">*</span></label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-percent input-icon"></i>
+                                <input type="number" id="edit-student-grade" min="0" max="100" step="0.1" required>
+                            </div>
                         </div>
+                        <div class="form-group">
+                            <label for="edit-student-gpa">GPA (0.0–4.0)</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-medal input-icon"></i>
+                                <input type="number" id="edit-student-gpa" min="0" max="4" step="0.01" placeholder="Leave blank to auto-calculate">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Row 2 -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-student-email">Email</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-envelope input-icon"></i>
+                                <input type="email" id="edit-student-email" placeholder="student@uni.edu">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-student-major">Major</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-book input-icon"></i>
+                                <input type="text" id="edit-student-major" placeholder="e.g. Computer Science">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Row 3 -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-student-year">Academic Year</label>
+                            <div class="input-wrapper select-wrapper">
+                                <i class="fa-solid fa-calendar-days input-icon"></i>
+                                <select id="edit-student-year">
+                                    <option value="">— Select —</option>
+                                    <option value="Freshman">Freshman</option>
+                                    <option value="Sophomore">Sophomore</option>
+                                    <option value="Junior">Junior</option>
+                                    <option value="Senior">Senior</option>
+                                    <option value="Graduate">Graduate</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Courses -->
+                    <div class="form-group">
+                        <label>Courses &amp; Grades</label>
+                        <div id="edit-courses-list" class="courses-list"></div>
+                        <button type="button" id="btn-edit-add-course" class="btn btn-sm btn-ghost mt-sm">
+                            <i class="fa-solid fa-plus"></i> Add Course
+                        </button>
+                    </div>
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="edit-student-notes">Academic Notes</label>
+                        <textarea id="edit-student-notes" rows="2" placeholder="Optional notes…"></textarea>
                     </div>
                     <div class="modal-actions">
                         <button type="button" id="btn-edit-cancel" class="btn btn-secondary">Cancel</button>
@@ -230,10 +392,23 @@
         </div>
     </div>
 
-    <!-- Toast Notification Container -->
+    <!-- ── Detail / Profile Modal ──────────────────────────────────────── -->
+    <div id="detail-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal modal-wide animate-scale">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-id-card"></i> Student Profile</h3>
+                <button id="detail-modal-close" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="detail-modal-body">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast Notification Container ───────────────────────────────── -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Scripts -->
+    <!-- ── Scripts ─────────────────────────────────────────────────────── -->
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
