@@ -9,6 +9,8 @@ handled by the UI layer.
 
 from __future__ import annotations
 
+import csv
+import io
 import threading
 from typing import List, Optional, Tuple
 
@@ -307,3 +309,96 @@ class StudentManager:
         with self._lock:
             self._students = students
         return len(self._students)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    #  CSV Import / Export
+    # ═══════════════════════════════════════════════════════════════════════
+
+    # CSV columns: name, grade, email, major, academic_year, gpa, notes
+    _CSV_FIELDS = ["name", "grade", "email", "major", "academic_year", "gpa", "notes"]
+
+    def export_csv(self, filepath: str) -> int:
+        """Writes all students to a CSV file.
+
+        Args:
+            filepath: Destination path (created or overwritten).
+
+        Returns:
+            Number of rows written.
+
+        Raises:
+            OSError: If the file cannot be written.
+        """
+        with self._lock:
+            snapshot = list(self._students)
+
+        with open(filepath, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=self._CSV_FIELDS)
+            writer.writeheader()
+            for s in snapshot:
+                writer.writerow({
+                    "name": s.name,
+                    "grade": s.grade,
+                    "email": s.email,
+                    "major": s.major,
+                    "academic_year": s.academic_year,
+                    "gpa": s.gpa if s.gpa is not None else "",
+                    "notes": s.notes,
+                })
+        return len(snapshot)
+
+    def import_csv(self, filepath: str) -> Tuple[int, List[str]]:
+        """Imports students from a CSV file, appending to existing data.
+
+        Skips rows with validation errors and collects their messages.
+
+        Args:
+            filepath: Path to a CSV file with a header row.
+
+        Returns:
+            (imported_count, list_of_error_messages)
+
+        Raises:
+            OSError: If the file cannot be read.
+        """
+        imported = 0
+        errors: List[str] = []
+
+        with open(filepath, newline="", encoding="utf-8") as fh:
+            reader = csv.DictReader(fh)
+            for line_num, row in enumerate(reader, start=2):  # 1 = header
+                name = (row.get("name") or "").strip()
+                raw_grade = (row.get("grade") or "").strip()
+
+                if not name:
+                    errors.append(f"Row {line_num}: missing name — skipped.")
+                    continue
+                try:
+                    grade = float(raw_grade)
+                except (ValueError, TypeError):
+                    errors.append(f"Row {line_num} ({name!r}): invalid grade {raw_grade!r} — skipped.")
+                    continue
+
+                raw_gpa = (row.get("gpa") or "").strip()
+                gpa: Optional[float] = None
+                if raw_gpa:
+                    try:
+                        gpa = float(raw_gpa)
+                    except ValueError:
+                        gpa = None
+
+                try:
+                    self.add_student(
+                        name=name,
+                        grade=grade,
+                        email=(row.get("email") or "").strip(),
+                        major=(row.get("major") or "").strip(),
+                        academic_year=(row.get("academic_year") or "").strip(),
+                        gpa=gpa,
+                        notes=(row.get("notes") or "").strip(),
+                    )
+                    imported += 1
+                except ValueError as exc:
+                    errors.append(f"Row {line_num} ({name!r}): {exc} — skipped.")
+
+        return imported, errors

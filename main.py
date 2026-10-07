@@ -14,6 +14,7 @@ import sys
 from app.config import (
     MENU_ADD, MENU_REMOVE, MENU_UPDATE, MENU_VIEW_ALL,
     MENU_SEARCH, MENU_STATS, MENU_SORT, MENU_SAVE, MENU_EXIT,
+    MENU_ANALYTICS, MENU_AT_RISK, MENU_EXPORT_CSV, MENU_IMPORT_CSV,
 )
 from app.storage.json_storage import JsonStorage
 from app.services.student_manager import StudentManager
@@ -28,14 +29,18 @@ from app.ui.handlers import MenuHandler
 # + one handler method in MenuHandler.
 
 MENU_DISPATCH = {
-    MENU_ADD:      MenuHandler.add_student,
-    MENU_REMOVE:   MenuHandler.remove_student,
-    MENU_UPDATE:   MenuHandler.update_grade,
-    MENU_VIEW_ALL: MenuHandler.view_all,
-    MENU_SEARCH:   MenuHandler.search,
-    MENU_STATS:    MenuHandler.statistics,
-    MENU_SORT:     MenuHandler.sort,
-    MENU_SAVE:     MenuHandler.save,
+    MENU_ADD:        MenuHandler.add_student,
+    MENU_REMOVE:     MenuHandler.remove_student,
+    MENU_UPDATE:     MenuHandler.update_grade,
+    MENU_VIEW_ALL:   MenuHandler.view_all,
+    MENU_SEARCH:     MenuHandler.search,
+    MENU_STATS:      MenuHandler.statistics,
+    MENU_SORT:       MenuHandler.sort,
+    MENU_SAVE:       MenuHandler.save,
+    MENU_ANALYTICS:  MenuHandler.analytics_dashboard,
+    MENU_AT_RISK:    MenuHandler.at_risk,
+    MENU_EXPORT_CSV: MenuHandler.export_csv,
+    MENU_IMPORT_CSV: MenuHandler.import_csv,
 }
 
 
@@ -64,7 +69,7 @@ def main() -> None:
         Display.menu()
         print()
 
-        choice = InputHelper.get_int("👉 Enter your choice (1-9): ")
+        choice = InputHelper.get_int("👉 Enter your choice (1-13): ")
 
         if choice == MENU_EXIT:
             MenuHandler.exit_app(manager)
@@ -74,7 +79,7 @@ def main() -> None:
         if handler:
             handler(manager)
         else:
-            Display.error("Invalid choice. Please select 1-9.")
+            Display.error("Invalid choice. Please select 1-13.")
 
         InputHelper.pause()
 

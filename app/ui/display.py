@@ -10,7 +10,7 @@ from typing import List
 
 from app.config import GRADE_EXCELLENT, GRADE_GOOD, GRADE_AVERAGE, GRADE_BELOW_AVG
 from app.models.student import Student
-from app.services.statistics_service import GradeStats
+from app.services.statistics_service import AnalyticsDashboard, AtRiskStudent, GradeStats
 from app.ui.colors import Colors
 
 
@@ -56,15 +56,19 @@ class Display:
         print(f"  {C.INDIGO}{C.BOLD}╠{'═' * W}╣{C.END}")
 
         menu_items = [
-            ("1", "➕", "Add Student",             C.LIME),
-            ("2", "➖", "Remove Student",          C.PINK),
-            ("3", "✏️ ", "Update Grade",             C.SKY),
-            ("4", "📄", "View All Students",       C.TEAL),
-            ("5", "🔍", "Search Student by Name",  C.LAVENDER),
-            ("6", "📊", "View Statistics",         C.ORANGE),
-            ("7", "🔃", "Sort by Grade",           C.CYAN),
-            ("8", "💾", "Save Data",               C.GREEN),
-            ("9", "🚪", "Exit",                    C.RED),
+            ("1",  "➕",  "Add Student",                 C.LIME),
+            ("2",  "➖",  "Remove Student",              C.PINK),
+            ("3",  "✏️ ", "Update Grade",                 C.SKY),
+            ("4",  "📄",  "View All Students",           C.TEAL),
+            ("5",  "🔍",  "Search Student by Name",      C.LAVENDER),
+            ("6",  "📊",  "View Statistics",             C.ORANGE),
+            ("7",  "🔃",  "Sort by Grade",               C.CYAN),
+            ("8",  "💾",  "Save Data",                   C.GREEN),
+            ("9",  "🚪",  "Exit",                        C.RED),
+            ("10", "📈",  "Analytics Dashboard",         C.TEAL),
+            ("11", "⚠️ ", "At-Risk Student Detection",   C.RED),
+            ("12", "📤",  "Export Students to CSV",      C.LIME),
+            ("13", "📥",  "Import Students from CSV",    C.SKY),
         ]
 
         for num, icon, label, color in menu_items:
@@ -317,3 +321,118 @@ class Display:
         """
         color, label, _, _ = Display._grade_badge(grade)
         return color, label
+
+    # ── Analytics Dashboard ──────────────────────────────────────────────
+
+    @staticmethod
+    def analytics_dashboard(dash: AnalyticsDashboard) -> None:
+        """Renders the full academic analytics dashboard.
+
+        Args:
+            dash: A computed AnalyticsDashboard dataclass.
+        """
+        C = Colors
+        W = Display.WIDTH
+
+        # ── Header
+        print(f"\n  {C.INDIGO}{C.BOLD}╔{'═' * W}╗{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}{C.BG_DEEP}{C.GOLD}{C.BOLD}{'📈  ACADEMIC ANALYTICS DASHBOARD':^{W}}{C.END}{C.INDIGO}{C.BOLD}║{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}╠{'═' * W}╣{C.END}")
+
+        if dash.total_students == 0:
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.YELLOW}No students to analyse.{C.END}")
+            print(f"  {C.INDIGO}{C.BOLD}╚{'═' * W}╝{C.END}")
+            return
+
+        # ── Key metrics
+        gpa_str = f"{dash.gpa_average}" if dash.gpa_average is not None else "N/A"
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.SKY}👥 Students      :{C.END}  {C.WHITE}{C.BOLD}{dash.total_students}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.TEAL}📊 Average Grade  :{C.END}  {C.WHITE}{C.BOLD}{dash.average}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.TEAL}📊 Median Grade   :{C.END}  {C.WHITE}{C.BOLD}{dash.median}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.LAVENDER}σ  Std Deviation  :{C.END}  {C.WHITE}{C.BOLD}{dash.std_dev}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.LIME}🏆 Highest        :{C.END}  {C.GREEN}{C.BOLD}{dash.highest}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.PINK}📉 Lowest         :{C.END}  {C.RED}{C.BOLD}{dash.lowest}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.GREEN}✅ Passing (≥60)  :{C.END}  {C.GREEN}{C.BOLD}{dash.passing_count}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.RED}❌ Failing (<60)  :{C.END}  {C.RED}{C.BOLD}{dash.failing_count}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.ORANGE}🎓 Avg GPA        :{C.END}  {C.WHITE}{C.BOLD}{gpa_str}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}   {C.RED}⚠️  At-Risk         :{C.END}  {C.RED}{C.BOLD}{dash.at_risk_count}{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}")
+
+        # ── Grade distribution bar chart
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.GOLD}{C.BOLD}Grade Distribution:{C.END}")
+        BAR_MAX = 20
+        for band, count in dash.distribution.items():
+            pct = (count / dash.total_students * 100) if dash.total_students else 0
+            filled = int(pct / 100 * BAR_MAX)
+            bar_color = C.GREEN if band.startswith("A") else (
+                C.CYAN if band.startswith("B") else (
+                C.BLUE if band.startswith("C") else (
+                C.YELLOW if band.startswith("D") else C.RED)))
+            bar = f"{bar_color}{'█' * filled}{C.DIM}{'░' * (BAR_MAX - filled)}{C.END}"
+            label = f"{band:<12}"
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}    {C.WHITE}{label}{C.END} {bar}  {C.WHITE}{C.BOLD}{count:>3}{C.END} {C.DIM}({pct:.0f}%){C.END}")
+
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}")
+
+        # ── Average grade by major (skip if none)
+        if dash.by_major:
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.GOLD}{C.BOLD}Avg Grade by Major:{C.END}")
+            for major, avg in sorted(dash.by_major.items(), key=lambda kv: -kv[1]):
+                bar_color, _, _, _ = Display._grade_badge(avg)
+                print(f"  {C.INDIGO}{C.BOLD}║{C.END}    {C.WHITE}{major:<20}{C.END} {bar_color}{C.BOLD}{avg}{C.END}")
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}")
+
+        print(f"  {C.INDIGO}{C.BOLD}╚{'═' * W}╝{C.END}")
+
+    # ── At-Risk Student Report ───────────────────────────────────────────
+
+    @staticmethod
+    def at_risk_report(at_risk: List[AtRiskStudent]) -> None:
+        """Renders the at-risk student intervention report.
+
+        Args:
+            at_risk: List of AtRiskStudent objects (sorted by grade asc).
+        """
+        C = Colors
+        W = Display.WIDTH
+
+        print(f"\n  {C.INDIGO}{C.BOLD}╔{'═' * W}╗{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}{C.BG_RED}{C.WHITE}{C.BOLD}{'⚠️   AT-RISK STUDENT REPORT':^{W}}{C.END}{C.INDIGO}{C.BOLD}║{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}╠{'═' * W}╣{C.END}")
+
+        if not at_risk:
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.GREEN}{C.BOLD}✅  No at-risk students detected.{C.END}")
+            print(f"  {C.INDIGO}{C.BOLD}╚{'═' * W}╝{C.END}")
+            return
+
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.RED}{C.BOLD}{len(at_risk)} student(s) flagged for intervention:{C.END}")
+        print(f"  {C.INDIGO}{C.BOLD}║{C.END}")
+
+        for ar in at_risk:
+            s = ar.student
+            color, _, _, _ = Display._grade_badge(s.grade)
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.DIM}┌{'─' * (W - 4)}┐{C.END}")
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.DIM}│{C.END}  {C.WHITE}{C.BOLD}{s.name}{C.END}  {C.DIM}(grade: {C.END}{color}{C.BOLD}{s.grade}{C.END}{C.DIM}){C.END}")
+            for reason in ar.reasons:
+                print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.DIM}│{C.END}    {C.YELLOW}• {reason}{C.END}")
+            print(f"  {C.INDIGO}{C.BOLD}║{C.END}  {C.DIM}└{'─' * (W - 4)}┘{C.END}")
+
+        print(f"  {C.INDIGO}{C.BOLD}╚{'═' * W}╝{C.END}")
+
+    # ── CSV Feedback ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def csv_result(action: str, count: int, errors: List[str]) -> None:
+        """Shows the result of a CSV import or export operation.
+
+        Args:
+            action: Human-readable action label (e.g. "Exported", "Imported").
+            count:  Number of rows processed.
+            errors: List of per-row error messages (may be empty).
+        """
+        C = Colors
+        Display.success(f"{action} {count} student(s).")
+        if errors:
+            print(f"\n  {C.YELLOW}{C.BOLD}  ⚠️  {len(errors)} row(s) skipped:{C.END}")
+            for msg in errors:
+                print(f"    {C.DIM}• {msg}{C.END}")

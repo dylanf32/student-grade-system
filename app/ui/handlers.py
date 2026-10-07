@@ -9,6 +9,9 @@ Handlers bridge the UI layer and the service layer:
 Adding a new feature = adding one new handler + one menu entry.
 """
 
+import os
+
+from app.config import DATA_DIR
 from app.services.student_manager import StudentManager
 from app.services.statistics_service import StatisticsService
 from app.ui.colors import Colors
@@ -198,3 +201,85 @@ class MenuHandler:
         print(f"  {C.INDIGO}{C.BOLD}║{C.END}{C.BG_DEEP}{C.WHITE}{C.BOLD}{'👋  Goodbye! Thank you for using the system.':^50}{C.END}{C.INDIGO}{C.BOLD}║{C.END}")
         print(f"  {C.INDIGO}{C.BOLD}╚{'═' * 50}╝{C.END}")
         print()
+
+    # ── 10. Analytics Dashboard ──────────────────────────────────────────
+
+    @staticmethod
+    def analytics_dashboard(manager: StudentManager) -> None:
+        """Computes and displays the full academic analytics dashboard."""
+        Display.section_header("Academic Analytics Dashboard", "📈", Colors.TEAL)
+
+        if manager.is_empty():
+            Display.warn("No students to analyse.")
+            return
+
+        students = manager.get_all_students()
+        dash = StatisticsService.compute_analytics(students)
+        Display.analytics_dashboard(dash)
+
+    # ── 11. At-Risk Detection ────────────────────────────────────────────
+
+    @staticmethod
+    def at_risk(manager: StudentManager) -> None:
+        """Identifies and displays at-risk students."""
+        Display.section_header("At-Risk Student Detection", "⚠️ ", Colors.RED)
+
+        if manager.is_empty():
+            Display.warn("No students in the system.")
+            return
+
+        students = manager.get_all_students()
+        at_risk_list = StatisticsService.detect_at_risk(students)
+        Display.at_risk_report(at_risk_list)
+
+    # ── 12. Export CSV ───────────────────────────────────────────────────
+
+    @staticmethod
+    def export_csv(manager: StudentManager) -> None:
+        """Exports all students to a CSV file in the data directory."""
+        Display.section_header("Export Students to CSV", "📤", Colors.GREEN)
+
+        if manager.is_empty():
+            Display.warn("No students to export.")
+            return
+
+        C = Colors
+        default_path = os.path.join(DATA_DIR, "students_export.csv")
+        print(f"  {C.DIM}Default path: {default_path}{C.END}")
+        raw = input(
+            f"  {C.INDIGO}{C.BOLD}▸{C.END} {C.WHITE}Export path (Enter for default): {C.END}"
+        ).strip()
+        filepath = raw if raw else default_path
+
+        try:
+            count = manager.export_csv(filepath)
+            Display.csv_result("Exported", count, [])
+            Display.info(f"File saved to: {filepath}")
+        except OSError as exc:
+            Display.error(f"Export failed: {exc}")
+
+    # ── 13. Import CSV ───────────────────────────────────────────────────
+
+    @staticmethod
+    def import_csv(manager: StudentManager) -> None:
+        """Imports students from a CSV file, appending to the current list."""
+        Display.section_header("Import Students from CSV", "📥", Colors.SKY)
+
+        C = Colors
+        filepath = input(
+            f"  {C.INDIGO}{C.BOLD}▸{C.END} {C.WHITE}CSV file path to import: {C.END}"
+        ).strip()
+        if not filepath:
+            Display.error("No path entered.")
+            return
+        if not os.path.isfile(filepath):
+            Display.error(f"File not found: {filepath}")
+            return
+
+        try:
+            imported, errors = manager.import_csv(filepath)
+            Display.csv_result("Imported", imported, errors)
+            if imported:
+                Display.student_table(manager.get_all_students())
+        except OSError as exc:
+            Display.error(f"Import failed: {exc}")
