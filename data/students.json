@@ -1,34 +1,101 @@
 [
     {
+        "id": "5debaf7a-0b67-4793-8fba-56e3b2781d7b",
         "name": "affan",
-        "grade": 92
+        "grade": 92.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     },
     {
+        "id": "d9c9968d-337d-4ac9-8ac2-4c7673e14600",
         "name": "ezaz",
-        "grade": 88
+        "grade": 88.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     },
     {
+        "id": "47bd0571-1369-4bf4-90dd-dbac1c505471",
         "name": "samin",
-        "grade": 77
+        "grade": 77.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     },
     {
+        "id": "0d160aaf-1d9a-481e-8cb8-2867c49c2acd",
         "name": "noor",
-        "grade": 76
+        "grade": 76.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     },
     {
+        "id": "8ff57dd7-6a4b-40ab-af46-f2f12bbd3bdb",
         "name": "huzaifa",
-        "grade": 57
+        "grade": 79.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     },
     {
+        "id": "154d99ba-f6ca-4cc6-8f86-97a767d70f5d",
         "name": "daniyal",
-        "grade": 45
+        "grade": 45.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     },
     {
+        "id": "a17e37b8-dcdf-472f-b0bb-2b4ae66c3ee1",
         "name": "ahmed",
-        "grade": 66
+        "grade": 66.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     },
     {
+        "id": "5ffb35a2-ee31-4f2a-b34c-be7a9ea091f7",
         "name": "Dylan",
-        "grade": 90
+        "grade": 90.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
+    },
+    {
+        "id": "4922392b-1010-4cb7-8b6d-9816877183d7",
+        "name": "Dylan",
+        "grade": 95.0,
+        "email": "",
+        "major": "",
+        "academic_year": "",
+        "gpa": null,
+        "courses": [],
+        "notes": ""
     }
 ]
