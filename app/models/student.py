@@ -117,10 +117,20 @@ class Student:
 
         Returns:
             A new Student instance.
+
+        Raises:
+            ValueError: If required keys are missing or values are invalid.
         """
+        try:
+            name = data["name"]
+            grade = data["grade"]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(
+                f"Student record is missing required field: {exc}"
+            ) from exc
         return cls(
-            name=data["name"],
-            grade=data["grade"],
+            name=name,
+            grade=grade,
             student_id=data.get("id"),  # None → auto-generate
         )
 

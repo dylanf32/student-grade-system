@@ -9,6 +9,7 @@ handled by the UI layer.
 
 from __future__ import annotations
 
+import threading
 from typing import List, Optional
 
 from app.models.student import Student
@@ -32,6 +33,7 @@ class StudentManager:
         """
         self._students: List[Student] = []
         self._storage: BaseStorage = storage
+        self._lock: threading.Lock = threading.Lock()
 
     # ═══════════════════════════════════════════════════════════════════════
     #  CRUD — Create
@@ -59,7 +61,8 @@ class StudentManager:
             raise ValueError(msg)
 
         student = Student(name, grade)
-        self._students.append(student)
+        with self._lock:
+            self._students.append(student)
         return student
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -86,7 +89,8 @@ class StudentManager:
         Returns:
             List of Student objects.
         """
-        return list(self._students)
+        with self._lock:
+            return list(self._students)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  CRUD — Update
@@ -105,16 +109,16 @@ class StudentManager:
         Raises:
             ValueError: If index or grade is invalid.
         """
-        valid, msg = InputValidator.validate_index(index, self.size())
-        if not valid:
-            raise ValueError(msg)
-
         valid, msg = InputValidator.validate_grade(new_grade)
         if not valid:
             raise ValueError(msg)
 
-        self._students[index].grade = new_grade
-        return self._students[index]
+        with self._lock:
+            valid, msg = InputValidator.validate_index(index, len(self._students))
+            if not valid:
+                raise ValueError(msg)
+            self._students[index].grade = new_grade
+            return self._students[index]
 
     # ═══════════════════════════════════════════════════════════════════════
     #  CRUD — Delete
@@ -132,10 +136,11 @@ class StudentManager:
         Raises:
             ValueError: If index is invalid.
         """
-        valid, msg = InputValidator.validate_index(index, self.size())
-        if not valid:
-            raise ValueError(msg)
-        return self._students.pop(index)
+        with self._lock:
+            valid, msg = InputValidator.validate_index(index, len(self._students))
+            if not valid:
+                raise ValueError(msg)
+            return self._students.pop(index)
 
     # ═══════════════════════════════════════════════════════════════════════
     #  Search
@@ -155,9 +160,10 @@ class StudentManager:
             Index of the first match, or -1 if not found.
         """
         target = name.strip().lower()
-        for i, student in enumerate(self._students):
-            if student.name.lower() == target:
-                return i
+        with self._lock:
+            for i, student in enumerate(self._students):
+                if student.name.lower() == target:
+                    return i
         return -1
 
     def search_all_by_name(self, name: str) -> list:
@@ -175,11 +181,12 @@ class StudentManager:
             ordered by their position in the list.  Empty list if none found.
         """
         target = name.strip().lower()
-        return [
-            (i, s)
-            for i, s in enumerate(self._students)
-            if s.name.lower() == target
-        ]
+        with self._lock:
+            return [
+                (i, s)
+                for i, s in enumerate(self._students)
+                if s.name.lower() == target
+            ]
 
     # ═══════════════════════════════════════════════════════════════════════
     #  Sort
@@ -194,11 +201,12 @@ class StudentManager:
         Returns:
             The sorted list (same reference).
         """
-        self._students.sort(
-            key=lambda s: s.grade,
-            reverse=not ascending,
-        )
-        return self._students
+        with self._lock:
+            self._students.sort(
+                key=lambda s: s.grade,
+                reverse=not ascending,
+            )
+            return self._students
 
     # ═══════════════════════════════════════════════════════════════════════
     #  Utility
@@ -206,11 +214,13 @@ class StudentManager:
 
     def size(self) -> int:
         """Returns the number of students."""
-        return len(self._students)
+        with self._lock:
+            return len(self._students)
 
     def is_empty(self) -> bool:
         """Returns True if no students are stored."""
-        return len(self._students) == 0
+        with self._lock:
+            return len(self._students) == 0
 
     # ═══════════════════════════════════════════════════════════════════════
     #  Persistence (delegates to storage backend)
@@ -222,7 +232,9 @@ class StudentManager:
         Returns:
             True on success.
         """
-        return self._storage.save(self._students)
+        with self._lock:
+            snapshot = list(self._students)
+        return self._storage.save(snapshot)
 
     def load(self) -> int:
         """Loads data from the storage backend.
@@ -230,5 +242,7 @@ class StudentManager:
         Returns:
             Number of students loaded.
         """
-        self._students = self._storage.load()
+        students = self._storage.load()
+        with self._lock:
+            self._students = students
         return len(self._students)

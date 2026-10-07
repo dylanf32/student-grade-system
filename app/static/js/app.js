@@ -85,33 +85,45 @@ function renderStudentTable(students) {
 
     subtitle.textContent = `Displaying ${students.length} record(s)`;
 
-    tbody.innerHTML = students.map(s => {
+    // Build rows as DOM nodes so no user-supplied value is ever interpolated
+    // into an attribute or event-handler string (XSS prevention).
+    tbody.innerHTML = '';
+    students.forEach(s => {
         const status = getGradeStatus(s.grade);
         const gradeColor = getGradeColor(s.grade);
-        // Use s.student_id (UUID) for all mutation operations so that a
-        // stale index can never target the wrong student.
-        const sid = s.student_id;
-        return `
-            <tr data-index="${s.index}" data-student-id="${sid}">
-                <td class="index-cell">${s.index}</td>
-                <td class="id-cell">${s.id}</td>
-                <td class="name-cell">${escapeHtml(s.name)}</td>
-                <td class="grade-cell" style="color: ${gradeColor};">${s.grade}</td>
-                <td><span class="badge ${status.badge}">${status.icon} ${status.label}</span></td>
-                <td class="text-right">
-                    <div class="actions-cell">
-                        <button class="btn-action btn-action-edit" title="Edit Grade"
-                                onclick="openEditModal('${sid}', '${escapeHtml(s.name)}', '${s.id}', ${s.grade})">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                        <button class="btn-action btn-action-delete" title="Delete Student"
-                                onclick="deleteStudent('${sid}', '${escapeHtml(s.name)}')">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>`;
-    }).join('');
+
+        const tr = document.createElement('tr');
+        tr.dataset.index = s.index;
+        tr.dataset.studentId = s.student_id;
+
+        tr.innerHTML = `
+            <td class="index-cell">${s.index}</td>
+            <td class="id-cell">${escapeHtml(s.id)}</td>
+            <td class="name-cell">${escapeHtml(s.name)}</td>
+            <td class="grade-cell" style="color: ${gradeColor};">${s.grade}</td>
+            <td><span class="badge ${status.badge}">${status.icon} ${status.label}</span></td>
+            <td class="text-right">
+                <div class="actions-cell">
+                    <button class="btn-action btn-action-edit" title="Edit Grade">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
+                    <button class="btn-action btn-action-delete" title="Delete Student">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </td>`;
+
+        // Attach handlers via addEventListener — no string interpolation into
+        // event attributes, so malicious names cannot inject JS.
+        tr.querySelector('.btn-action-edit').addEventListener('click', () => {
+            openEditModal(s.student_id, s.name, s.id, s.grade);
+        });
+        tr.querySelector('.btn-action-delete').addEventListener('click', () => {
+            deleteStudent(s.student_id, s.name);
+        });
+
+        tbody.appendChild(tr);
+    });
 }
 
 function escapeHtml(text) {
