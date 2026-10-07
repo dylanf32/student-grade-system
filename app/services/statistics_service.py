@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from app.config import PASSING_THRESHOLD
 from app.models.student import Student
 
 
@@ -88,7 +89,7 @@ class StatisticsService:
     as method arguments rather than holding its own copy.
     """
 
-    PASS_THRESHOLD: int = 60
+    PASS_THRESHOLD: int = PASSING_THRESHOLD
 
     # ── Core Statistics ──────────────────────────────────────────────────
 
@@ -240,7 +241,7 @@ class StatisticsService:
 
     # Thresholds
     _AT_RISK_GRADE: float = 65.0        # grade below this triggers a flag
-    _FAILING_GRADE: float = 60.0        # hard failing threshold
+    _FAILING_GRADE: float = float(PASSING_THRESHOLD)  # derived from shared config
 
     # Grade band labels (ordered A→F)
     _BANDS = ["A (90-100)", "B (80-89)", "C (70-79)", "D (60-69)", "F (<60)"]

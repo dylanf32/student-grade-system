@@ -4,8 +4,9 @@ from flask import Flask, jsonify, request, render_template
 from app.storage.json_storage import JsonStorage
 from app.services.student_manager import StudentManager
 from app.services.statistics_service import StatisticsService
+from app.services.insights_service import InsightsService
 from app.models.student import Student, CourseGrade
-from app.config import MIN_GRADE, MAX_GRADE
+from app.config import MIN_GRADE, MAX_GRADE, PASSING_THRESHOLD
 
 # Set directories relative to this file
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'app', 'templates'))
@@ -54,7 +55,11 @@ def student_to_payload(s: Student, index: int) -> dict:
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """Expose grade boundary constants so the frontend stays in sync with config.py."""
-    return jsonify({"min_grade": MIN_GRADE, "max_grade": MAX_GRADE})
+    return jsonify({
+        "min_grade": MIN_GRADE,
+        "max_grade": MAX_GRADE,
+        "passing_threshold": PASSING_THRESHOLD,
+    })
 
 
 @app.route('/')
@@ -117,7 +122,13 @@ def add_student():
             courses=courses,
             notes=data.get("notes", ""),
         )
-        manager.save()
+        if not manager.save():
+            # Roll back: remove the student that was just added in memory.
+            all_students = manager.get_all_students()
+            rollback_idx = next((i for i, s in enumerate(all_students) if s.id == student.id), None)
+            if rollback_idx is not None:
+                manager.remove_student(rollback_idx)
+            return jsonify({"success": False, "error": "Student could not be saved. Please try again."}), 500
         students = manager.get_all_students()
         idx = next(i for i, s in enumerate(students) if s.id == student.id)
         return jsonify({"success": True, "student": student_to_payload(student, idx)})
@@ -173,9 +184,26 @@ def update_student(student_id):
     if not fields:
         return jsonify({"success": False, "error": "No fields to update."}), 400
 
+    # Snapshot the current state before mutating so we can roll back.
+    existing = manager.get_by_id(student_id)
+    if existing is None:
+        return jsonify({"success": False, "error": "Student not found."}), 404
+    old_fields = {
+        "grade": existing.grade,
+        "email": existing.email,
+        "major": existing.major,
+        "academic_year": existing.academic_year,
+        "gpa": existing.gpa,
+        "courses": existing.courses,
+        "notes": existing.notes,
+    }
+
     try:
         student = manager.update_student(student_id, **fields)
-        manager.save()
+        if not manager.save():
+            # Roll back: restore the previous field values.
+            manager.update_student(student_id, **old_fields)
+            return jsonify({"success": False, "error": "Update could not be saved. Please try again."}), 500
         students = manager.get_all_students()
         idx = next((i for i, s in enumerate(students) if s.id == student.id), 0)
         return jsonify({"success": True, "student": student_to_payload(student, idx)})
@@ -193,7 +221,10 @@ def delete_student(student_id):
 
     try:
         student = manager.remove_student(index)
-        manager.save()
+        if not manager.save():
+            # Roll back: re-insert the student at the original index.
+            manager._students.insert(index, student)
+            return jsonify({"success": False, "error": "Deletion could not be saved. Please try again."}), 500
         return jsonify({
             "success": True,
             "student": {"name": student.name, "grade": student.grade}
@@ -211,6 +242,7 @@ def get_stats():
     """Retrieve current grade statistics plus academic standing distribution."""
     students = manager.get_all_students()
     stats = StatisticsService.compute(students)
+    analytics = StatisticsService.compute_analytics(students)
 
     passing_rate = round(
         (stats.passing_count / stats.total_students * 100), 1
@@ -251,7 +283,30 @@ def get_stats():
         "avg_gpa": avg_gpa,
         "standing_distribution": standing_dist,
         "major_distribution": major_dist,
+        "grade_distribution": analytics.distribution,
     })
+
+
+# ---------------------------------------------------------------------------
+# Insights
+# ---------------------------------------------------------------------------
+
+@app.route('/api/insights', methods=['GET'])
+def get_insights():
+    """Return per-student support flags derived from the shared passing threshold."""
+    students = manager.get_all_students()
+    insights = InsightsService.get_insights(students)
+    return jsonify([
+        {
+            "student_id": i.student_id,
+            "name": i.name,
+            "grade": i.grade,
+            "threshold": i.threshold,
+            "status": i.status,
+            "reason": i.reason,
+        }
+        for i in insights
+    ])
 
 
 # ---------------------------------------------------------------------------
@@ -321,9 +376,13 @@ def sort_students():
     """Sort students by grade in-place and return the sorted list."""
     ascending = request.args.get("ascending", "true").lower() == "true"
     manager.sort_by_grade(ascending)
-    manager.save()
+    saved = manager.save()
     students = manager.get_all_students()
-    return jsonify([student_to_payload(s, i) for i, s in enumerate(students)])
+    payload = [student_to_payload(s, i) for i, s in enumerate(students)]
+    if not saved:
+        # Sort succeeded in memory; warn the client that the order was not persisted.
+        return jsonify({"success": False, "error": "Sort order could not be saved.", "students": payload}), 500
+    return jsonify(payload)
 
 
 @app.route('/api/save', methods=['POST'])

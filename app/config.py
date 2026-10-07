@@ -16,11 +16,16 @@ BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR: str = os.path.join(BASE_DIR, "data")
 DEFAULT_DATA_FILE: str = os.path.join(DATA_DIR, "students.json")
 
-# ── Grade Thresholds (for display status) ────────────────────────────────
+# ── Passing Threshold ────────────────────────────────────────────────────
+# Single authoritative value used by statistics, validation, and the frontend.
+# A student with grade >= PASSING_THRESHOLD is counted as passing.
+PASSING_THRESHOLD: int = 60
+
+# ── Grade Band Boundaries (for display labels) ────────────────────────────
 GRADE_EXCELLENT: int = 90
 GRADE_GOOD: int = 80
 GRADE_AVERAGE: int = 70
-GRADE_BELOW_AVG: int = 60
+GRADE_BELOW_AVG: int = 60   # == PASSING_THRESHOLD; label: "Passing (D)"
 
 # ── Menu Options ─────────────────────────────────────────────────────────
 MENU_ADD = 1

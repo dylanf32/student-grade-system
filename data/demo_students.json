@@ -1,0 +1,266 @@
+[
+    {
+        "id": "demo-0001-aaaa-bbbb-cccc00000001",
+        "name": "Aisha Rahman",
+        "grade": 94,
+        "email": "aisha.rahman@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Senior",
+        "gpa": 3.85,
+        "courses": [
+            {"course": "Algorithms", "grade": 96},
+            {"course": "Machine Learning", "grade": 92},
+            {"course": "Software Engineering", "grade": 95}
+        ],
+        "notes": "Dean's List candidate. Excellent performance across all modules."
+    },
+    {
+        "id": "demo-0002-aaaa-bbbb-cccc00000002",
+        "name": "Marcus Johnson",
+        "grade": 88,
+        "email": "marcus.j@university.edu",
+        "major": "Data Science",
+        "academic_year": "Junior",
+        "gpa": 3.40,
+        "courses": [
+            {"course": "Statistics", "grade": 90},
+            {"course": "Python for Data Science", "grade": 87},
+            {"course": "Database Systems", "grade": 86}
+        ],
+        "notes": "Strong analytical skills. Participates actively in seminars."
+    },
+    {
+        "id": "demo-0003-aaaa-bbbb-cccc00000003",
+        "name": "Priya Sharma",
+        "grade": 82,
+        "email": "priya.sharma@university.edu",
+        "major": "Mathematics",
+        "academic_year": "Sophomore",
+        "gpa": 3.10,
+        "courses": [
+            {"course": "Calculus II", "grade": 85},
+            {"course": "Linear Algebra", "grade": 80},
+            {"course": "Discrete Math", "grade": 81}
+        ],
+        "notes": ""
+    },
+    {
+        "id": "demo-0004-aaaa-bbbb-cccc00000004",
+        "name": "Omar Hassan",
+        "grade": 76,
+        "email": "omar.hassan@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Junior",
+        "gpa": 2.80,
+        "courses": [
+            {"course": "Operating Systems", "grade": 74},
+            {"course": "Networks", "grade": 78},
+            {"course": "Web Development", "grade": 76}
+        ],
+        "notes": "Consistent but has room to improve in lower-level systems courses."
+    },
+    {
+        "id": "demo-0005-aaaa-bbbb-cccc00000005",
+        "name": "Sofia Morales",
+        "grade": 91,
+        "email": "sofia.morales@university.edu",
+        "major": "Software Engineering",
+        "academic_year": "Senior",
+        "gpa": 3.70,
+        "courses": [
+            {"course": "Software Architecture", "grade": 93},
+            {"course": "Testing & QA", "grade": 89},
+            {"course": "Agile Methods", "grade": 91}
+        ],
+        "notes": "Outstanding project work. Internship at tech company this semester."
+    },
+    {
+        "id": "demo-0006-aaaa-bbbb-cccc00000006",
+        "name": "Ethan Lee",
+        "grade": 67,
+        "email": "ethan.lee@university.edu",
+        "major": "Information Systems",
+        "academic_year": "Sophomore",
+        "gpa": 2.20,
+        "courses": [
+            {"course": "Intro to Databases", "grade": 70},
+            {"course": "Business Analysis", "grade": 65},
+            {"course": "Spreadsheet Modeling", "grade": 66}
+        ],
+        "notes": "Passing but near the threshold. Should seek tutoring support."
+    },
+    {
+        "id": "demo-0007-aaaa-bbbb-cccc00000007",
+        "name": "Fatima Al-Sayed",
+        "grade": 54,
+        "email": "fatima.alsayed@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Freshman",
+        "gpa": null,
+        "courses": [
+            {"course": "Intro to Programming", "grade": 52},
+            {"course": "Computer Fundamentals", "grade": 56}
+        ],
+        "notes": "Below passing threshold. Attending tutoring sessions twice weekly."
+    },
+    {
+        "id": "demo-0008-aaaa-bbbb-cccc00000008",
+        "name": "James Okafor",
+        "grade": 78,
+        "email": "james.okafor@university.edu",
+        "major": "Cybersecurity",
+        "academic_year": "Junior",
+        "gpa": 2.90,
+        "courses": [
+            {"course": "Network Security", "grade": 80},
+            {"course": "Ethical Hacking", "grade": 76},
+            {"course": "Cryptography", "grade": 78}
+        ],
+        "notes": ""
+    },
+    {
+        "id": "demo-0009-aaaa-bbbb-cccc00000009",
+        "name": "Lily Chen",
+        "grade": 97,
+        "email": "lily.chen@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Senior",
+        "gpa": 4.00,
+        "courses": [
+            {"course": "Compilers", "grade": 98},
+            {"course": "Advanced Algorithms", "grade": 96},
+            {"course": "Research Methods", "grade": 97}
+        ],
+        "notes": "Top of cohort. Research assistant for the AI lab."
+    },
+    {
+        "id": "demo-0010-aaaa-bbbb-cccc00000010",
+        "name": "Daniel Torres",
+        "grade": 43,
+        "email": "daniel.torres@university.edu",
+        "major": "Mathematics",
+        "academic_year": "Sophomore",
+        "gpa": null,
+        "courses": [
+            {"course": "Calculus I", "grade": 40},
+            {"course": "Statistics", "grade": 46}
+        ],
+        "notes": "Significantly below passing threshold. Academic advisor referral made."
+    },
+    {
+        "id": "demo-0011-aaaa-bbbb-cccc00000011",
+        "name": "Nadia Petrov",
+        "grade": 85,
+        "email": "nadia.petrov@university.edu",
+        "major": "Data Science",
+        "academic_year": "Junior",
+        "gpa": 3.25,
+        "courses": [
+            {"course": "Machine Learning", "grade": 88},
+            {"course": "Data Visualization", "grade": 83},
+            {"course": "Statistical Inference", "grade": 84}
+        ],
+        "notes": ""
+    },
+    {
+        "id": "demo-0012-aaaa-bbbb-cccc00000012",
+        "name": "Carlos Rivera",
+        "grade": 60,
+        "email": "carlos.rivera@university.edu",
+        "major": "Information Systems",
+        "academic_year": "Freshman",
+        "gpa": null,
+        "courses": [
+            {"course": "Intro to IT", "grade": 60},
+            {"course": "Office Productivity", "grade": 60}
+        ],
+        "notes": "Exactly at the passing threshold. Encourage continued effort."
+    },
+    {
+        "id": "demo-0013-aaaa-bbbb-cccc00000013",
+        "name": "Amara Diallo",
+        "grade": 72,
+        "email": "amara.diallo@university.edu",
+        "major": "Software Engineering",
+        "academic_year": "Sophomore",
+        "gpa": 2.60,
+        "courses": [
+            {"course": "Object-Oriented Design", "grade": 74},
+            {"course": "Web Technologies", "grade": 70},
+            {"course": "Version Control", "grade": 72}
+        ],
+        "notes": ""
+    },
+    {
+        "id": "demo-0014-aaaa-bbbb-cccc00000014",
+        "name": "Samuel Kim",
+        "grade": 58,
+        "email": "samuel.kim@university.edu",
+        "major": "Cybersecurity",
+        "academic_year": "Freshman",
+        "gpa": null,
+        "courses": [
+            {"course": "Computer Fundamentals", "grade": 60},
+            {"course": "Intro to Security", "grade": 56}
+        ],
+        "notes": "Just below passing threshold. Has shown improvement over the month."
+    },
+    {
+        "id": "demo-0015-aaaa-bbbb-cccc00000015",
+        "name": "Isabella Novak",
+        "grade": 89,
+        "email": "isabella.novak@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Senior",
+        "gpa": 3.55,
+        "courses": [
+            {"course": "Distributed Systems", "grade": 91},
+            {"course": "Cloud Computing", "grade": 88},
+            {"course": "DevOps", "grade": 88}
+        ],
+        "notes": "Strong practical skills. Good capstone project progress."
+    },
+    {
+        "id": "demo-0016-aaaa-bbbb-cccc00000016",
+        "name": "Kwame Asante",
+        "grade": 63,
+        "email": "kwame.asante@university.edu",
+        "major": "Mathematics",
+        "academic_year": "Junior",
+        "gpa": 2.10,
+        "courses": [
+            {"course": "Real Analysis", "grade": 62},
+            {"course": "Probability Theory", "grade": 64}
+        ],
+        "notes": "Passing. Struggled with abstract proofs; attending supplemental sessions."
+    },
+    {
+        "id": "demo-0017-aaaa-bbbb-cccc00000017",
+        "name": "Zara Ahmed",
+        "grade": 95,
+        "email": "zara.ahmed@university.edu",
+        "major": "Data Science",
+        "academic_year": "Senior",
+        "gpa": 3.90,
+        "courses": [
+            {"course": "Big Data Engineering", "grade": 96},
+            {"course": "NLP", "grade": 94},
+            {"course": "Data Ethics", "grade": 95}
+        ],
+        "notes": "Graduating with distinction. Strong research portfolio."
+    },
+    {
+        "id": "demo-0018-aaaa-bbbb-cccc00000018",
+        "name": "Theo Okonkwo",
+        "grade": 35,
+        "email": "theo.okonkwo@university.edu",
+        "major": "Computer Science",
+        "academic_year": "Freshman",
+        "gpa": null,
+        "courses": [
+            {"course": "Intro to Programming", "grade": 38},
+            {"course": "Computer Fundamentals", "grade": 32}
+        ],
+        "notes": "Well below passing threshold. Intensive support plan initiated."
+    }
+]

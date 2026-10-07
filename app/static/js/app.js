@@ -10,11 +10,13 @@ const API = {
     sort:     '/api/sort',
     save:     '/api/save',
     config:   '/api/config',
+    insights: '/api/insights',
 };
 
 // Grade bounds — updated from /api/config on load; defaults match config.py.
 let minGrade = 0;
 let maxGrade = 100;
+let passingThreshold = 60;  // updated from /api/config; drives badge labels
 
 /* ==========================================================================
    TOAST NOTIFICATION SYSTEM
@@ -42,11 +44,11 @@ function showToast(message, type = 'info') {
    GRADE / STANDING HELPERS
    ========================================================================== */
 function getGradeStatus(grade) {
-    if (grade >= 90) return { label: 'Excellent',  badge: 'badge-excellent',  icon: '🌟' };
-    if (grade >= 80) return { label: 'Good',        badge: 'badge-good',       icon: '👍' };
-    if (grade >= 70) return { label: 'Average',     badge: 'badge-average',    icon: '📘' };
-    if (grade >= 60) return { label: 'Below Avg',   badge: 'badge-below-avg',  icon: '⚠️' };
-    return           { label: 'Failing',            badge: 'badge-failing',    icon: '❌' };
+    if (grade >= 90) return { label: 'Excellent',     badge: 'badge-excellent',  icon: '🌟' };
+    if (grade >= 80) return { label: 'Good',           badge: 'badge-good',       icon: '👍' };
+    if (grade >= 70) return { label: 'Average',        badge: 'badge-average',    icon: '📘' };
+    if (grade >= passingThreshold) return { label: 'Passing (D)', badge: 'badge-below-avg', icon: '⚠️' };
+    return           { label: 'Failing',               badge: 'badge-failing',    icon: '❌' };
 }
 
 function getGradeColor(grade) {
@@ -92,6 +94,7 @@ async function loadStudents() {
         const students = await res.json();
         renderStudentTable(students);
         loadStats();
+        loadInsights();
     } catch (err) {
         showToast('Failed to load students.', 'error');
     }
@@ -176,9 +179,139 @@ async function loadStats() {
         setTextIfExists('stat-highest',  stats.highest);
         setTextIfExists('stat-pass-rate', stats.passing_rate + '%');
         setTextIfExists('stat-avg-gpa',  stats.avg_gpa != null ? stats.avg_gpa.toFixed(2) : '—');
+        renderGradeDistChart(stats.grade_distribution);
     } catch (err) {
         // silently fail
     }
+}
+
+/* ==========================================================================
+   FETCH & RENDER: SUPPORT PANEL (INSIGHTS)
+   ========================================================================== */
+async function loadInsights() {
+    try {
+        const res = await fetch(API.insights);
+        if (!res.ok) { console.warn(`Insights error: ${res.status}`); return; }
+        const insights = await res.json();
+
+        const panel     = document.getElementById('support-panel');
+        const list      = document.getElementById('support-list');
+        const badge     = document.getElementById('support-count-badge');
+        const threshold = document.getElementById('support-threshold');
+        if (!panel || !list) return;
+
+        const flagged = insights.filter(i => i.status === 'needs_attention');
+
+        // Update threshold display from first record (all share the same value).
+        if (insights.length > 0 && threshold) {
+            threshold.textContent = insights[0].threshold;
+        }
+
+        if (flagged.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        panel.style.display = '';
+        if (badge) badge.textContent = `${flagged.length} student${flagged.length !== 1 ? 's' : ''} flagged`;
+
+        list.innerHTML = '';
+        flagged.forEach(item => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.75rem;background:var(--surface);border-radius:6px;border-left:3px solid var(--warning);';
+            const nameSpan = document.createElement('span');
+            nameSpan.style.cssText = 'font-weight:600;min-width:140px;';
+            nameSpan.textContent = item.name;
+            const gradeSpan = document.createElement('span');
+            gradeSpan.style.cssText = 'font-weight:700;color:var(--danger);min-width:48px;';
+            gradeSpan.textContent = item.grade;
+            const reasonSpan = document.createElement('span');
+            reasonSpan.style.cssText = 'color:var(--text-muted);font-size:0.85rem;';
+            reasonSpan.textContent = item.reason;
+            row.appendChild(nameSpan);
+            row.appendChild(gradeSpan);
+            row.appendChild(reasonSpan);
+            list.appendChild(row);
+        });
+    } catch (err) {
+        // Non-fatal: silently skip the support panel.
+    }
+}
+
+/* ==========================================================================
+   GRADE DISTRIBUTION CHART (vanilla SVG, no external deps)
+   ========================================================================== */
+function renderGradeDistChart(distribution) {
+    const section = document.getElementById('grade-dist-section');
+    const svg     = document.getElementById('grade-dist-chart');
+    if (!section || !svg) return;
+
+    // Band order matches StatisticsService._BANDS
+    const bands  = ['A (90-100)', 'B (80-89)', 'C (70-79)', 'D (60-69)', 'F (<60)'];
+    const colors = ['#22c55e', '#3b82f6', '#a78bfa', '#f59e0b', '#ef4444'];
+    const counts = bands.map(b => (distribution && distribution[b] != null) ? distribution[b] : 0);
+    const total  = counts.reduce((a, b) => a + b, 0);
+
+    if (total === 0) { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    const maxCount = Math.max(...counts, 1);
+    const svgW = 560;  // logical width; SVG scales via viewBox
+    const svgH = 140;
+    const barH = 28;
+    const barGap = 8;
+    const labelW = 90;
+    const countW = 40;
+    const barMaxW = svgW - labelW - countW - 16;
+
+    svg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+    svg.innerHTML = '';
+
+    bands.forEach((band, i) => {
+        const y = i * (barH + barGap);
+        const barW = Math.round((counts[i] / maxCount) * barMaxW);
+
+        // Label
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', labelW - 6);
+        text.setAttribute('y', y + barH / 2 + 5);
+        text.setAttribute('text-anchor', 'end');
+        text.setAttribute('font-size', '11');
+        text.setAttribute('fill', '#57606a');
+        text.textContent = band;
+        svg.appendChild(text);
+
+        // Bar background
+        const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        bgRect.setAttribute('x', labelW);
+        bgRect.setAttribute('y', y);
+        bgRect.setAttribute('width', barMaxW);
+        bgRect.setAttribute('height', barH);
+        bgRect.setAttribute('rx', 4);
+        bgRect.setAttribute('fill', '#f0f2f5');
+        svg.appendChild(bgRect);
+
+        // Bar fill
+        if (barW > 0) {
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', labelW);
+            rect.setAttribute('y', y);
+            rect.setAttribute('width', barW);
+            rect.setAttribute('height', barH);
+            rect.setAttribute('rx', 4);
+            rect.setAttribute('fill', colors[i]);
+            svg.appendChild(rect);
+        }
+
+        // Count label
+        const countText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        countText.setAttribute('x', labelW + barMaxW + 8);
+        countText.setAttribute('y', y + barH / 2 + 5);
+        countText.setAttribute('font-size', '11');
+        countText.setAttribute('fill', '#57606a');
+        countText.textContent = counts[i];
+        svg.appendChild(countText);
+    });
 }
 
 function setTextIfExists(id, value) {
@@ -749,7 +882,8 @@ async function loadConfig() {
         const cfg = await res.json();
         if (typeof cfg.min_grade === 'number') minGrade = cfg.min_grade;
         if (typeof cfg.max_grade === 'number') maxGrade = cfg.max_grade;
+        if (typeof cfg.passing_threshold === 'number') passingThreshold = cfg.passing_threshold;
     } catch (_) {
-        // Non-fatal: retain defaults (0 / 100).
+        // Non-fatal: retain defaults (0 / 100 / 60).
     }
 }

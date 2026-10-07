@@ -75,6 +75,32 @@
             </div>
         </section>
 
+        <!-- ── Grade Distribution Chart ──────────────────────────────── -->
+        <section id="grade-dist-section" class="card glass-card" style="margin:0 0 1.5rem 0;display:none;">
+            <div class="card-header">
+                <h2 style="margin:0;"><i class="fa-solid fa-chart-bar" style="color:var(--info);"></i> Grade Distribution</h2>
+            </div>
+            <div class="card-body" style="padding-top:0.5rem;">
+                <svg id="grade-dist-chart" width="100%" height="160" role="img" aria-label="Grade distribution bar chart"
+                     style="overflow:visible;display:block;"></svg>
+            </div>
+        </section>
+
+        <!-- ── Support Panel ──────────────────────────────────────────── -->
+        <section id="support-panel" class="support-panel card glass-card" style="margin:0 0 1.5rem 0;display:none;">
+            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                <h2 style="margin:0;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> Support Panel — Students Needing Attention</h2>
+                <span id="support-count-badge" class="result-badge" style="font-size:0.8rem;"></span>
+            </div>
+            <div class="card-body" style="padding-top:0.5rem;">
+                <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 0.75rem 0;">
+                    Students whose current grade is below the passing threshold (<strong id="support-threshold">60</strong>).
+                    Flags update automatically when grades change.
+                </p>
+                <div id="support-list" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
+            </div>
+        </section>
+
         <!-- ── Main Workspace ──────────────────────────────────────────── -->
         <main class="dashboard-main">
 
