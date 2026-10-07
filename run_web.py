@@ -48,11 +48,7 @@ def add_student():
         return jsonify({"success": False, "error": "Grade is required."}), 400
         
     try:
-        # grade must be numeric
         grade_val = float(grade)
-        # if integer representation is identical (e.g. 85.0), make it integer
-        if grade_val.is_integer():
-            grade_val = int(grade_val)
     except (ValueError, TypeError):
         return jsonify({"success": False, "error": "Grade must be a number."}), 400
 
@@ -77,8 +73,6 @@ def update_student(student_id):
         
     try:
         grade_val = float(new_grade)
-        if grade_val.is_integer():
-            grade_val = int(grade_val)
     except (ValueError, TypeError):
         return jsonify({"success": False, "error": "Grade must be a number."}), 400
 

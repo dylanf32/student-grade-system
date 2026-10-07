@@ -15,6 +15,7 @@ const API = {
    ========================================================================== */
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
+    if (!container) { console.warn('Missing element: toast-container'); return; }
     const toast = document.createElement('div');
 
     const iconMap = {
@@ -59,6 +60,10 @@ function getGradeColor(grade) {
 async function loadStudents() {
     try {
         const res = await fetch(API.students);
+        if (!res.ok) {
+            showToast(`Server error (${res.status}). Please try again.`, 'error');
+            return;
+        }
         const students = await res.json();
         renderStudentTable(students);
         loadStats();
@@ -70,6 +75,9 @@ async function loadStudents() {
 function renderStudentTable(students) {
     const tbody = document.getElementById('students-table-body');
     const subtitle = document.getElementById('table-subtitle');
+
+    if (!tbody) { console.warn('Missing element: students-table-body'); return; }
+    if (!subtitle) { console.warn('Missing element: table-subtitle'); return; }
 
     if (!students || students.length === 0) {
         tbody.innerHTML = `
@@ -138,31 +146,56 @@ function escapeHtml(text) {
 async function loadStats() {
     try {
         const res = await fetch(API.stats);
+        if (!res.ok) {
+            // Stats are secondary — warn in console rather than interrupting the user.
+            console.warn(`Failed to load stats: server returned ${res.status}`);
+            return;
+        }
         const stats = await res.json();
 
-        document.getElementById('stat-total').textContent = stats.total_students;
-        document.getElementById('stat-average').textContent = stats.average;
-        document.getElementById('stat-highest').textContent = stats.highest;
-        document.getElementById('stat-lowest').textContent = stats.lowest;
-        document.getElementById('stat-pass-rate').textContent = stats.passing_rate + '%';
+        setTextIfExists('stat-total',     stats.total_students);
+        setTextIfExists('stat-average',   stats.average);
+        setTextIfExists('stat-highest',   stats.highest);
+        setTextIfExists('stat-lowest',    stats.lowest);
+        setTextIfExists('stat-pass-rate', stats.passing_rate + '%');
     } catch (err) {
         // silently fail stats, table is more important
     }
 }
 
+/** Sets textContent on an element by id; warns to console if the element is absent.
+ *  null / undefined are rendered as "—" so the UI never shows the string "null". */
+function setTextIfExists(id, value) {
+    const el = document.getElementById(id);
+    if (!el) { console.warn(`Missing element: ${id}`); return; }
+    el.textContent = (value == null) ? '—' : value;
+}
+
 /* ==========================================================================
    ADD STUDENT
    ========================================================================== */
-document.getElementById('add-student-form').addEventListener('submit', async (e) => {
+async function submitAddStudent(e) {
     e.preventDefault();
 
     const nameInput = document.getElementById('student-name');
     const gradeInput = document.getElementById('student-grade');
+    if (!nameInput || !gradeInput) { console.warn('Missing add-student form inputs'); return; }
+
     const name = nameInput.value.trim();
     const grade = gradeInput.value;
 
     if (!name) {
         showToast('Please enter a student name.', 'error');
+        nameInput.focus();
+        return;
+    }
+    if (name.length < 2) {
+        showToast('Name must be at least 2 characters long.', 'error');
+        nameInput.focus();
+        return;
+    }
+    if (/\d/.test(name)) {
+        showToast('Name should not contain numbers.', 'error');
         nameInput.focus();
         return;
     }
@@ -178,6 +211,10 @@ document.getElementById('add-student-form').addEventListener('submit', async (e)
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, grade: Number(grade) }),
         });
+        if (!res.ok) {
+            showToast(`Server error (${res.status}). Could not add student.`, 'error');
+            return;
+        }
         const data = await res.json();
 
         if (data.success) {
@@ -192,7 +229,7 @@ document.getElementById('add-student-form').addEventListener('submit', async (e)
     } catch (err) {
         showToast('Network error. Could not add student.', 'error');
     }
-});
+}
 
 /* ==========================================================================
    DELETE STUDENT
@@ -202,6 +239,10 @@ async function deleteStudent(studentId, name) {
 
     try {
         const res = await fetch(`${API.students}/${studentId}`, { method: 'DELETE' });
+        if (!res.ok) {
+            showToast(`Server error (${res.status}). Could not delete student.`, 'error');
+            return;
+        }
         const data = await res.json();
 
         if (data.success) {
@@ -218,14 +259,18 @@ async function deleteStudent(studentId, name) {
 /* ==========================================================================
    EDIT GRADE MODAL
    ========================================================================== */
-const editModal = document.getElementById('edit-modal');
-const editForm = document.getElementById('edit-grade-form');
-const editIdInput = document.getElementById('edit-student-id');
-const editGradeInput = document.getElementById('edit-student-grade');
-const modalNameEl = document.getElementById('modal-student-name');
-const modalIdEl = document.getElementById('modal-student-id');
-
 function openEditModal(studentId, name, displayId, currentGrade) {
+    const editModal      = document.getElementById('edit-modal');
+    const editIdInput    = document.getElementById('edit-student-id');
+    const editGradeInput = document.getElementById('edit-student-grade');
+    const modalNameEl    = document.getElementById('modal-student-name');
+    const modalIdEl      = document.getElementById('modal-student-id');
+
+    if (!editModal || !editIdInput || !editGradeInput || !modalNameEl || !modalIdEl) {
+        console.warn('Missing one or more edit-modal elements');
+        return;
+    }
+
     editIdInput.value = studentId;  // store UUID, not position
     editGradeInput.value = currentGrade;
     modalNameEl.textContent = name;
@@ -236,89 +281,46 @@ function openEditModal(studentId, name, displayId, currentGrade) {
 }
 
 function closeEditModal() {
+    const editModal = document.getElementById('edit-modal');
+    if (!editModal) { console.warn('Missing element: edit-modal'); return; }
     editModal.classList.add('hidden');
 }
-
-document.getElementById('modal-close').addEventListener('click', closeEditModal);
-document.getElementById('btn-edit-cancel').addEventListener('click', closeEditModal);
-
-// Close modal on overlay click
-editModal.addEventListener('click', (e) => {
-    if (e.target === editModal) closeEditModal();
-});
-
-// Close modal on Escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !editModal.classList.contains('hidden')) {
-        closeEditModal();
-    }
-});
-
-editForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const studentId = editIdInput.value;  // UUID, not positional index
-    const newGrade = editGradeInput.value;
-
-    if (newGrade === '' || isNaN(newGrade) || Number(newGrade) < 0 || Number(newGrade) > 100) {
-        showToast('Grade must be between 0 and 100.', 'error');
-        editGradeInput.focus();
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API.students}/${studentId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ grade: Number(newGrade) }),
-        });
-        const data = await res.json();
-
-        if (data.success) {
-            showToast(`✏️ ${data.student.name}'s grade updated to ${data.student.grade}`, 'success');
-            closeEditModal();
-            loadStudents();
-        } else {
-            showToast(data.error || 'Failed to update grade.', 'error');
-        }
-    } catch (err) {
-        showToast('Network error. Could not update grade.', 'error');
-    }
-});
 
 /* ==========================================================================
    SEARCH STUDENT
    ========================================================================== */
 let searchDebounce = null;
-const searchInput = document.getElementById('search-input');
-const searchResultContainer = document.getElementById('search-result-container');
-
-searchInput.addEventListener('input', () => {
-    clearTimeout(searchDebounce);
-    const query = searchInput.value.trim();
-
-    if (!query) {
-        searchResultContainer.classList.add('hidden');
-        clearHighlight();
-        return;
-    }
-
-    searchDebounce = setTimeout(() => performSearch(query), 350);
-});
 
 async function performSearch(query) {
     try {
         const res = await fetch(`${API.search}?name=${encodeURIComponent(query)}`);
+        if (!res.ok) {
+            console.warn(`Search failed: server returned ${res.status}`);
+            return;
+        }
         const data = await res.json();
 
-        if (data.found) {
+        const searchResultContainer = document.getElementById('search-result-container');
+        if (!searchResultContainer) { console.warn('Missing element: search-result-container'); return; }
+
+        if (data.found && data.students && data.students.length > 0) {
             // data.students contains all matches (may be > 1 for duplicate names).
             const students = data.students;
             const first = students[0];
 
             // Update the visible result card with the first match summary.
-            document.getElementById('result-name').textContent = first.name;
-            document.getElementById('result-id').textContent = first.id;
-            document.getElementById('result-grade').textContent =
+            const resultName  = document.getElementById('result-name');
+            const resultId    = document.getElementById('result-id');
+            const resultGrade = document.getElementById('result-grade');
+
+            if (!resultName || !resultId || !resultGrade) {
+                console.warn('Missing one or more search result elements');
+                return;
+            }
+
+            resultName.textContent = first.name;
+            resultId.textContent   = first.id;
+            resultGrade.textContent =
                 students.length === 1
                     ? `Grade: ${first.grade}`
                     : `${students.length} matches — grades: ${students.map(s => s.grade).join(', ')}`;
@@ -348,34 +350,16 @@ function clearHighlight() {
     document.querySelectorAll('.row-highlight').forEach(r => r.classList.remove('row-highlight'));
 }
 
-document.getElementById('btn-search-locate').addEventListener('click', () => {
-    clearHighlight();
-    const name = document.getElementById('result-name').textContent;
-    const rows = document.querySelectorAll('#students-table-body tr');
-    rows.forEach(row => {
-        const nameCell = row.querySelector('.name-cell');
-        if (nameCell && nameCell.textContent === name) {
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            row.classList.add('row-highlight');
-        }
-    });
-});
-
-document.getElementById('btn-search-clear').addEventListener('click', () => {
-    searchInput.value = '';
-    searchResultContainer.classList.add('hidden');
-    clearHighlight();
-});
-
 /* ==========================================================================
    SORT STUDENTS
    ========================================================================== */
-document.getElementById('btn-sort-asc').addEventListener('click', () => sortStudents(true));
-document.getElementById('btn-sort-desc').addEventListener('click', () => sortStudents(false));
-
 async function sortStudents(ascending) {
     try {
         const res = await fetch(`${API.sort}?ascending=${ascending}`);
+        if (!res.ok) {
+            showToast(`Server error (${res.status}). Could not sort students.`, 'error');
+            return;
+        }
         const students = await res.json();
         renderStudentTable(students);
         loadStats();
@@ -386,26 +370,190 @@ async function sortStudents(ascending) {
 }
 
 /* ==========================================================================
-   SAVE DATABASE
-   ========================================================================== */
-document.getElementById('btn-save-db').addEventListener('click', async () => {
-    try {
-        const res = await fetch(API.save, { method: 'POST' });
-        const data = await res.json();
-
-        if (data.success) {
-            showToast('💾 Database saved successfully!', 'success');
-        } else {
-            showToast('Failed to save database.', 'error');
-        }
-    } catch (err) {
-        showToast('Network error. Could not save.', 'error');
-    }
-});
-
-/* ==========================================================================
-   INITIAL LOAD
+   INITIAL LOAD — wire up all DOM-dependent code after the DOM is ready
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
+
+    // ── Add Student Form ─────────────────────────────────────────────────────
+    const addForm = document.getElementById('add-student-form');
+    if (!addForm) {
+        console.warn('Missing element: add-student-form');
+    } else {
+        addForm.addEventListener('submit', submitAddStudent);
+    }
+
+    // ── Edit Grade Modal ──────────────────────────────────────────────────────
+    const editModal = document.getElementById('edit-modal');
+    const modalClose = document.getElementById('modal-close');
+    const btnEditCancel = document.getElementById('btn-edit-cancel');
+    const editForm = document.getElementById('edit-grade-form');
+    const editIdInput = document.getElementById('edit-student-id');
+    const editGradeInput = document.getElementById('edit-student-grade');
+
+    if (!modalClose) {
+        console.warn('Missing element: modal-close');
+    } else {
+        modalClose.addEventListener('click', closeEditModal);
+    }
+
+    if (!btnEditCancel) {
+        console.warn('Missing element: btn-edit-cancel');
+    } else {
+        btnEditCancel.addEventListener('click', closeEditModal);
+    }
+
+    // Close modal on overlay click
+    if (editModal) {
+        editModal.addEventListener('click', (e) => {
+            if (e.target === editModal) closeEditModal();
+        });
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('edit-modal');
+            if (modal && !modal.classList.contains('hidden')) closeEditModal();
+        }
+    });
+
+    if (!editForm) {
+        console.warn('Missing element: edit-grade-form');
+    } else {
+        editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!editIdInput || !editGradeInput) {
+                console.warn('Missing edit form input elements');
+                return;
+            }
+            const studentId = editIdInput.value;  // UUID, not positional index
+            const newGrade = editGradeInput.value;
+
+            if (newGrade === '' || isNaN(newGrade) || Number(newGrade) < 0 || Number(newGrade) > 100) {
+                showToast('Grade must be between 0 and 100.', 'error');
+                editGradeInput.focus();
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API.students}/${studentId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ grade: Number(newGrade) }),
+                });
+                if (!res.ok) {
+                    showToast(`Server error (${res.status}). Could not update grade.`, 'error');
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast(`✏️ ${data.student.name}'s grade updated to ${data.student.grade}`, 'success');
+                    closeEditModal();
+                    loadStudents();
+                } else {
+                    showToast(data.error || 'Failed to update grade.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Could not update grade.', 'error');
+            }
+        });
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────────
+    const searchInput = document.getElementById('search-input');
+
+    if (!searchInput) {
+        console.warn('Missing element: search-input');
+    } else {
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchDebounce);
+            const query = searchInput.value.trim();
+            const searchResultContainer = document.getElementById('search-result-container');
+
+            if (!query) {
+                if (searchResultContainer) searchResultContainer.classList.add('hidden');
+                clearHighlight();
+                return;
+            }
+
+            searchDebounce = setTimeout(() => performSearch(query), 350);
+        });
+    }
+
+    const btnSearchLocate = document.getElementById('btn-search-locate');
+    if (!btnSearchLocate) {
+        console.warn('Missing element: btn-search-locate');
+    } else {
+        btnSearchLocate.addEventListener('click', () => {
+            clearHighlight();
+            const resultName = document.getElementById('result-name');
+            if (!resultName) { console.warn('Missing element: result-name'); return; }
+            const name = resultName.textContent;
+            const rows = document.querySelectorAll('#students-table-body tr');
+            rows.forEach(row => {
+                const nameCell = row.querySelector('.name-cell');
+                if (nameCell && nameCell.textContent === name) {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    row.classList.add('row-highlight');
+                }
+            });
+        });
+    }
+
+    const btnSearchClear = document.getElementById('btn-search-clear');
+    if (!btnSearchClear) {
+        console.warn('Missing element: btn-search-clear');
+    } else {
+        btnSearchClear.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            const searchResultContainer = document.getElementById('search-result-container');
+            if (searchResultContainer) searchResultContainer.classList.add('hidden');
+            clearHighlight();
+        });
+    }
+
+    // ── Sort Buttons ──────────────────────────────────────────────────────────
+    const btnSortAsc = document.getElementById('btn-sort-asc');
+    const btnSortDesc = document.getElementById('btn-sort-desc');
+
+    if (!btnSortAsc) {
+        console.warn('Missing element: btn-sort-asc');
+    } else {
+        btnSortAsc.addEventListener('click', () => sortStudents(true));
+    }
+
+    if (!btnSortDesc) {
+        console.warn('Missing element: btn-sort-desc');
+    } else {
+        btnSortDesc.addEventListener('click', () => sortStudents(false));
+    }
+
+    // ── Save Database ─────────────────────────────────────────────────────────
+    const btnSaveDb = document.getElementById('btn-save-db');
+    if (!btnSaveDb) {
+        console.warn('Missing element: btn-save-db');
+    } else {
+        btnSaveDb.addEventListener('click', async () => {
+            try {
+                const res = await fetch(API.save, { method: 'POST' });
+                if (!res.ok) {
+                    showToast(`Server error (${res.status}). Could not save database.`, 'error');
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.success) {
+                    showToast('💾 Database saved successfully!', 'success');
+                } else {
+                    showToast('Failed to save database.', 'error');
+                }
+            } catch (err) {
+                showToast('Network error. Could not save.', 'error');
+            }
+        });
+    }
+
+    // ── Initial Data Load ─────────────────────────────────────────────────────
     loadStudents();
 });

@@ -87,10 +87,10 @@ class TestStatisticsEmpty(unittest.TestCase):
         self.assertEqual(StatisticsService.get_average([]), 0.0)
 
     def test_highest_empty(self):
-        self.assertEqual(StatisticsService.get_highest([]), 0)
+        self.assertIsNone(StatisticsService.get_highest([]))
 
     def test_lowest_empty(self):
-        self.assertEqual(StatisticsService.get_lowest([]), 0)
+        self.assertIsNone(StatisticsService.get_lowest([]))
 
 
 if __name__ == "__main__":

@@ -161,7 +161,11 @@ class MenuHandler:
         print(f"    {C.PINK}{C.BOLD}2.{C.END} {C.WHITE}Descending (highest → lowest){C.END}")
         print()
 
-        choice    = InputHelper.get_int("Choose sort order (1 or 2): ")
+        while True:
+            choice = InputHelper.get_int("Choose sort order (1 or 2): ")
+            if choice in (1, 2):
+                break
+            Display.error("Invalid choice. Please enter 1 or 2.")
         ascending = choice != 2
 
         manager.sort_by_grade(ascending=ascending)

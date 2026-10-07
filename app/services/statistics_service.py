@@ -9,7 +9,7 @@ without bloating the CRUD service.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from app.models.student import Student
 
@@ -29,8 +29,8 @@ class GradeStats:
 
     total_students: int
     average: float
-    highest: float
-    lowest: float
+    highest: Optional[float]
+    lowest: Optional[float]
     passing_count: int
     failing_count: int
 
@@ -60,8 +60,8 @@ class StatisticsService:
             return GradeStats(
                 total_students=0,
                 average=0.0,
-                highest=0,
-                lowest=0,
+                highest=None,
+                lowest=None,
                 passing_count=0,
                 failing_count=0,
             )
@@ -88,14 +88,18 @@ class StatisticsService:
         return round(sum(s.grade for s in students) / len(students), 2)
 
     @staticmethod
-    def get_highest(students: List[Student]) -> float:
-        """Returns the highest grade, or 0 if empty."""
-        return max((s.grade for s in students), default=0)
+    def get_highest(students: List[Student]) -> Optional[float]:
+        """Returns the highest grade, or None if the list is empty."""
+        if not students:
+            return None
+        return max(s.grade for s in students)
 
     @staticmethod
-    def get_lowest(students: List[Student]) -> float:
-        """Returns the lowest grade, or 0 if empty."""
-        return min((s.grade for s in students), default=0)
+    def get_lowest(students: List[Student]) -> Optional[float]:
+        """Returns the lowest grade, or None if the list is empty."""
+        if not students:
+            return None
+        return min(s.grade for s in students)
 
     @staticmethod
     def get_sorted(

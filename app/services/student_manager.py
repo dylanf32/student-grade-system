@@ -10,7 +10,7 @@ handled by the UI layer.
 from __future__ import annotations
 
 import threading
-from typing import List, Optional
+from typing import List
 
 from app.models.student import Student
 from app.storage.base_storage import BaseStorage
@@ -69,18 +69,21 @@ class StudentManager:
     #  CRUD — Read
     # ═══════════════════════════════════════════════════════════════════════
 
-    def get_student(self, index: int) -> Optional[Student]:
+    def get_student(self, index: int) -> Student:
         """Returns the student at the given index.
 
         Args:
             index: 0-based index.
 
         Returns:
-            Student object, or None if index is invalid.
+            Student object.
+
+        Raises:
+            ValueError: If index is invalid.
         """
-        valid, _ = InputValidator.validate_index(index, self.size())
+        valid, msg = InputValidator.validate_index(index, self.size())
         if not valid:
-            return None
+            raise ValueError(msg)
         return self._students[index]
 
     def get_all_students(self) -> List[Student]:
