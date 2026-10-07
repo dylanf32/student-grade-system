@@ -24,11 +24,12 @@ def index():
 
 @app.route('/api/students', methods=['GET'])
 def get_students():
-    """Retrieve all students with their absolute indices."""
+    """Retrieve all students with their absolute indices and stable UUIDs."""
     students = manager.get_all_students()
     return jsonify([
         {
             "index": i,
+            "student_id": s.id,
             "id": f"STU-{i+1:03d}",
             "name": s.name,
             "grade": s.grade
@@ -60,14 +61,14 @@ def add_student():
         manager.save()
         return jsonify({
             "success": True,
-            "student": {"name": student.name, "grade": student.grade}
+            "student": {"student_id": student.id, "name": student.name, "grade": student.grade}
         })
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
-@app.route('/api/students/<int:index>', methods=['PUT'])
-def update_student(index):
-    """Update a student's grade at a specific index."""
+@app.route('/api/students/<student_id>', methods=['PUT'])
+def update_student(student_id):
+    """Update a student's grade identified by their stable UUID."""
     data = request.json or {}
     new_grade = data.get("grade")
     
@@ -81,19 +82,37 @@ def update_student(index):
     except (ValueError, TypeError):
         return jsonify({"success": False, "error": "Grade must be a number."}), 400
 
+    # Find the student by stable UUID, not by list position.
+    students = manager.get_all_students()
+    index = next((i for i, s in enumerate(students) if s.id == student_id), None)
+    if index is None:
+        return jsonify({"success": False, "error": "Student not found."}), 404
+
     try:
         student = manager.update_grade(index, grade_val)
         manager.save()
         return jsonify({
             "success": True,
-            "student": {"name": student.name, "grade": student.grade}
+            "student": {"student_id": student.id, "name": student.name, "grade": student.grade}
         })
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
-@app.route('/api/students/<int:index>', methods=['DELETE'])
-def delete_student(index):
-    """Delete a student at a specific index."""
+
+@app.route('/api/students/<student_id>', methods=['DELETE'])
+def delete_student(student_id):
+    """Delete a student identified by their stable UUID.
+
+    Using UUID instead of list position means that deleting one student
+    never changes the identity of any other student, and a stale request
+    for an already-deleted ID returns 404 rather than silently deleting
+    the wrong person.
+    """
+    students = manager.get_all_students()
+    index = next((i for i, s in enumerate(students) if s.id == student_id), None)
+    if index is None:
+        return jsonify({"success": False, "error": "Student not found."}), 404
+
     try:
         student = manager.remove_student(index)
         manager.save()
@@ -138,6 +157,7 @@ def search_student():
             "index": index,
             "student": {
                 "index": index,
+                "student_id": s.id,
                 "id": f"STU-{index+1:03d}",
                 "name": s.name,
                 "grade": s.grade
@@ -152,11 +172,12 @@ def sort_students():
     manager.sort_by_grade(ascending)
     manager.save()
     
-    # Return sorted list
+    # Return sorted list with stable UUIDs
     students = manager.get_all_students()
     return jsonify([
         {
             "index": i,
+            "student_id": s.id,
             "id": f"STU-{i+1:03d}",
             "name": s.name,
             "grade": s.grade

@@ -6,6 +6,7 @@ Implements BaseStorage using a simple JSON file.
 
 import json
 import os
+import tempfile
 from typing import List
 
 from app.config import DEFAULT_DATA_FILE
@@ -37,7 +38,13 @@ class JsonStorage(BaseStorage):
     # ── BaseStorage Implementation ───────────────────────────────────────
 
     def save(self, students: List[Student]) -> bool:
-        """Writes all students to the JSON file.
+        """Atomically writes all students to the JSON file.
+
+        Writes to a temporary file in the same directory first, flushes
+        and syncs it to disk, then uses os.replace() to atomically swap
+        it over the original.  The original file is never truncated or
+        removed until the replacement is fully written, so a crash at
+        any point leaves the previous data intact.
 
         Args:
             students: List of Student objects.
@@ -45,14 +52,44 @@ class JsonStorage(BaseStorage):
         Returns:
             True on success, False on failure.
         """
+        target_dir = os.path.dirname(self._file_path)
+        # dirname is empty when file_path is a bare filename; use "." so
+        # makedirs and NamedTemporaryFile both have a real directory.
+        if not target_dir:
+            target_dir = "."
+        tmp_path: str | None = None
         try:
-            os.makedirs(os.path.dirname(self._file_path), exist_ok=True)
+            os.makedirs(target_dir, exist_ok=True)
             data = [s.to_dict() for s in students]
-            with open(self._file_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=4, ensure_ascii=False)
+
+            # Write to a sibling temp file so os.replace stays on the
+            # same filesystem (required for atomicity on most OSes).
+            fd, tmp_path = tempfile.mkstemp(
+                dir=target_dir, suffix=".tmp", prefix=".students_"
+            )
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    json.dump(data, fh, indent=4, ensure_ascii=False)
+                    fh.flush()
+                    os.fsync(fh.fileno())
+            except Exception:
+                # fd is already closed by the context manager on exception,
+                # but we still need to clean up the temp file.
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
+
+            # Atomic replacement — original is untouched until this succeeds.
+            os.replace(tmp_path, self._file_path)
+            tmp_path = None  # ownership transferred; no cleanup needed
             return True
-        except (IOError, OSError) as exc:
+        except Exception as exc:
             print(f"  [Storage Error] Could not save: {exc}")
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
             return False
 
     def load(self) -> List[Student]:

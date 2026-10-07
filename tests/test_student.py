@@ -66,7 +66,10 @@ class TestStudentSerialization(unittest.TestCase):
 
     def test_to_dict(self):
         s = Student("Zain", 88)
-        self.assertEqual(s.to_dict(), {"name": "Zain", "grade": 88})
+        d = s.to_dict()
+        self.assertEqual(d["name"], "Zain")
+        self.assertEqual(d["grade"], 88)
+        self.assertIn("id", d)  # UUID must now be present
 
     def test_from_dict(self):
         s = Student.from_dict({"name": "Hira", "grade": 92})
@@ -96,6 +99,82 @@ class TestStudentEquality(unittest.TestCase):
         a = Student("Ali", 80)
         b = Student("Ali", 90)
         self.assertNotEqual(a, b)
+
+
+# ── UUID / stable identity tests ─────────────────────────────────────────────
+
+class TestStudentUUID(unittest.TestCase):
+    """Students must carry stable, unique IDs."""
+
+    def test_new_student_gets_uuid(self):
+        s = Student("Ali", 85)
+        self.assertIsNotNone(s.id)
+        self.assertGreater(len(s.id), 0)
+
+    def test_two_students_have_different_ids(self):
+        a = Student("Ali", 85)
+        b = Student("Ali", 85)
+        self.assertNotEqual(a.id, b.id)
+
+    def test_id_preserved_through_serialisation(self):
+        """Round-trip through to_dict/from_dict must keep the same UUID."""
+        original = Student("Sara", 90)
+        rebuilt = Student.from_dict(original.to_dict())
+        self.assertEqual(original.id, rebuilt.id)
+
+    def test_from_dict_without_id_generates_uuid(self):
+        """Legacy JSON records without an id key must be assigned a UUID."""
+        legacy = {"name": "Old Student", "grade": 70}
+        s = Student.from_dict(legacy)
+        self.assertIsNotNone(s.id)
+        self.assertGreater(len(s.id), 0)
+
+    def test_deleting_one_student_does_not_change_other_ids(self):
+        """IDs of remaining students must be unaffected by a deletion."""
+        from app.services.student_manager import StudentManager
+        from app.storage.base_storage import BaseStorage
+
+        class FakeStorage(BaseStorage):
+            def save(self, students):
+                return True
+            def load(self):
+                return []
+
+        mgr = StudentManager(FakeStorage())
+        mgr.add_student("Alice", 85)
+        mgr.add_student("Bob", 70)
+        mgr.add_student("Carol", 90)
+
+        ids_before = [s.id for s in mgr.get_all_students()]
+        # Delete the first student (index 0).
+        mgr.remove_student(0)
+        ids_after = [s.id for s in mgr.get_all_students()]
+
+        # Bob and Carol's UUIDs must be unchanged.
+        self.assertEqual(ids_before[1], ids_after[0])
+        self.assertEqual(ids_before[2], ids_after[1])
+
+    def test_stale_id_does_not_match_any_remaining_student(self):
+        """An already-deleted UUID must not match any surviving student."""
+        from app.services.student_manager import StudentManager
+        from app.storage.base_storage import BaseStorage
+
+        class FakeStorage(BaseStorage):
+            def save(self, students):
+                return True
+            def load(self):
+                return []
+
+        mgr = StudentManager(FakeStorage())
+        mgr.add_student("Alice", 85)
+        mgr.add_student("Bob", 70)
+
+        students = mgr.get_all_students()
+        stale_id = students[0].id
+        mgr.remove_student(0)
+
+        remaining_ids = [s.id for s in mgr.get_all_students()]
+        self.assertNotIn(stale_id, remaining_ids)
 
 
 if __name__ == "__main__":

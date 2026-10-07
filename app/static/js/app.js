@@ -87,8 +87,11 @@ function renderStudentTable(students) {
     tbody.innerHTML = students.map(s => {
         const status = getGradeStatus(s.grade);
         const gradeColor = getGradeColor(s.grade);
+        // Use s.student_id (UUID) for all mutation operations so that a
+        // stale index can never target the wrong student.
+        const sid = s.student_id;
         return `
-            <tr data-index="${s.index}">
+            <tr data-index="${s.index}" data-student-id="${sid}">
                 <td class="index-cell">${s.index}</td>
                 <td class="id-cell">${s.id}</td>
                 <td class="name-cell">${escapeHtml(s.name)}</td>
@@ -97,11 +100,11 @@ function renderStudentTable(students) {
                 <td class="text-right">
                     <div class="actions-cell">
                         <button class="btn-action btn-action-edit" title="Edit Grade"
-                                onclick="openEditModal(${s.index}, '${escapeHtml(s.name)}', '${s.id}', ${s.grade})">
+                                onclick="openEditModal('${sid}', '${escapeHtml(s.name)}', '${s.id}', ${s.grade})">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
                         <button class="btn-action btn-action-delete" title="Delete Student"
-                                onclick="deleteStudent(${s.index}, '${escapeHtml(s.name)}')">
+                                onclick="deleteStudent('${sid}', '${escapeHtml(s.name)}')">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
@@ -181,11 +184,11 @@ document.getElementById('add-student-form').addEventListener('submit', async (e)
 /* ==========================================================================
    DELETE STUDENT
    ========================================================================== */
-async function deleteStudent(index, name) {
+async function deleteStudent(studentId, name) {
     if (!confirm(`Are you sure you want to remove "${name}"?`)) return;
 
     try {
-        const res = await fetch(`${API.students}/${index}`, { method: 'DELETE' });
+        const res = await fetch(`${API.students}/${studentId}`, { method: 'DELETE' });
         const data = await res.json();
 
         if (data.success) {
@@ -204,16 +207,16 @@ async function deleteStudent(index, name) {
    ========================================================================== */
 const editModal = document.getElementById('edit-modal');
 const editForm = document.getElementById('edit-grade-form');
-const editIndexInput = document.getElementById('edit-student-index');
+const editIdInput = document.getElementById('edit-student-id');
 const editGradeInput = document.getElementById('edit-student-grade');
 const modalNameEl = document.getElementById('modal-student-name');
 const modalIdEl = document.getElementById('modal-student-id');
 
-function openEditModal(index, name, id, currentGrade) {
-    editIndexInput.value = index;
+function openEditModal(studentId, name, displayId, currentGrade) {
+    editIdInput.value = studentId;  // store UUID, not position
     editGradeInput.value = currentGrade;
     modalNameEl.textContent = name;
-    modalIdEl.textContent = id;
+    modalIdEl.textContent = displayId;
     editModal.classList.remove('hidden');
     editGradeInput.focus();
     editGradeInput.select();
@@ -240,7 +243,7 @@ document.addEventListener('keydown', (e) => {
 
 editForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const index = editIndexInput.value;
+    const studentId = editIdInput.value;  // UUID, not positional index
     const newGrade = editGradeInput.value;
 
     if (newGrade === '' || isNaN(newGrade) || Number(newGrade) < 0 || Number(newGrade) > 100) {
@@ -250,7 +253,7 @@ editForm.addEventListener('submit', async (e) => {
     }
 
     try {
-        const res = await fetch(`${API.students}/${index}`, {
+        const res = await fetch(`${API.students}/${studentId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ grade: Number(newGrade) }),
