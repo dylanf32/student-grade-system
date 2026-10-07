@@ -29,8 +29,6 @@ class InputValidator:
             return False, "Name cannot be empty."
         if len(name.strip()) < 2:
             return False, "Name must be at least 2 characters long."
-        if any(ch.isdigit() for ch in name):
-            return False, "Name should not contain numbers."
         return True, ""
 
     @staticmethod

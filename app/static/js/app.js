@@ -8,7 +8,12 @@ const API = {
     search: '/api/search',
     sort: '/api/sort',
     save: '/api/save',
+    config: '/api/config',
 };
+
+// Grade bounds — updated from /api/config on load; defaults match config.py.
+let minGrade = 0;
+let maxGrade = 100;
 
 /* ==========================================================================
    TOAST NOTIFICATION SYSTEM
@@ -28,10 +33,13 @@ function showToast(message, type = 'info') {
     toast.innerHTML = `<i class="fa-solid ${iconMap[type] || iconMap.info}"></i> ${message}`;
     container.appendChild(toast);
 
-    // Auto-remove after animation completes
-    setTimeout(() => {
+    // Auto-remove after animation completes.
+    // Store the timer ID so it can be cancelled if the toast is removed early.
+    const timerId = setTimeout(() => {
+        clearTimeout(timerId);
         if (toast.parentNode) toast.parentNode.removeChild(toast);
     }, 5000);
+    toast.dataset.timerId = timerId;
 }
 
 /* ==========================================================================
@@ -194,13 +202,8 @@ async function submitAddStudent(e) {
         nameInput.focus();
         return;
     }
-    if (/\d/.test(name)) {
-        showToast('Name should not contain numbers.', 'error');
-        nameInput.focus();
-        return;
-    }
-    if (grade === '' || isNaN(grade) || Number(grade) < 0 || Number(grade) > 100) {
-        showToast('Grade must be a number between 0 and 100.', 'error');
+    if (grade === '' || isNaN(grade) || Number(grade) < minGrade || Number(grade) > maxGrade) {
+        showToast(`Grade must be a number between ${minGrade} and ${maxGrade}.`, 'error');
         gradeInput.focus();
         return;
     }
@@ -429,8 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const studentId = editIdInput.value;  // UUID, not positional index
             const newGrade = editGradeInput.value;
 
-            if (newGrade === '' || isNaN(newGrade) || Number(newGrade) < 0 || Number(newGrade) > 100) {
-                showToast('Grade must be between 0 and 100.', 'error');
+            if (newGrade === '' || isNaN(newGrade) || Number(newGrade) < minGrade || Number(newGrade) > maxGrade) {
+                showToast(`Grade must be between ${minGrade} and ${maxGrade}.`, 'error');
                 editGradeInput.focus();
                 return;
             }
@@ -555,5 +558,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Initial Data Load ─────────────────────────────────────────────────────
-    loadStudents();
+    loadConfig().then(() => loadStudents());
 });
+
+async function loadConfig() {
+    try {
+        const res = await fetch(API.config);
+        if (!res.ok) return;
+        const cfg = await res.json();
+        if (typeof cfg.min_grade === 'number') minGrade = cfg.min_grade;
+        if (typeof cfg.max_grade === 'number') maxGrade = cfg.max_grade;
+    } catch (_) {
+        // Non-fatal: retain defaults (0 / 100) if the endpoint is unavailable.
+    }
+}

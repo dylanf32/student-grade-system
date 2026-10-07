@@ -27,8 +27,13 @@ class TestValidateName(unittest.TestCase):
         self.assertFalse(valid)
 
     def test_name_with_numbers(self):
+        """Digits in names are permitted (e.g. 'John 2nd', 'Ali123')."""
         valid, msg = InputValidator.validate_name("Ali123")
-        self.assertFalse(valid)
+        self.assertTrue(valid)
+
+    def test_name_with_ordinal_suffix(self):
+        valid, msg = InputValidator.validate_name("John 2nd")
+        self.assertTrue(valid)
 
 
 class TestValidateGrade(unittest.TestCase):

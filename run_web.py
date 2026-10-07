@@ -5,6 +5,7 @@ from app.storage.json_storage import JsonStorage
 from app.services.student_manager import StudentManager
 from app.services.statistics_service import StatisticsService
 from app.models.student import Student
+from app.config import MIN_GRADE, MAX_GRADE
 
 # Set directories relative to this file
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'app', 'templates'))
@@ -16,6 +17,11 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 storage = JsonStorage()
 manager = StudentManager(storage)
 manager.load()
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Expose grade boundary constants so the frontend stays in sync with config.py."""
+    return jsonify({"min_grade": MIN_GRADE, "max_grade": MAX_GRADE})
 
 @app.route('/')
 def index():

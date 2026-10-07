@@ -86,6 +86,29 @@ class TestStudentSerialization(unittest.TestCase):
         self.assertIn("Ali", str(s))
         self.assertIn("80", str(s))
 
+    def test_repr(self):
+        s = Student("Ali", 80)
+        r = repr(s)
+        self.assertIn("Ali", r)
+        self.assertIn("80", r)
+        self.assertIn(s.id, r)
+
+
+class TestStudentFromDictMalformed(unittest.TestCase):
+    """Tests for from_dict() with missing or invalid input."""
+
+    def test_missing_name_raises(self):
+        with self.assertRaises(ValueError):
+            Student.from_dict({"grade": 50})
+
+    def test_missing_grade_raises(self):
+        with self.assertRaises(ValueError):
+            Student.from_dict({"name": "Ali"})
+
+    def test_none_input_raises(self):
+        with self.assertRaises(ValueError):
+            Student.from_dict(None)
+
 
 class TestStudentEquality(unittest.TestCase):
     """Tests for __eq__.
