@@ -1,11 +1,14 @@
 import os
+from datetime import date, datetime
 from flask import Flask, jsonify, request, render_template
 
 from app.storage.json_storage import JsonStorage
+from app.storage.deadline_storage import DeadlineStorage
 from app.services.student_manager import StudentManager
 from app.services.statistics_service import StatisticsService
 from app.services.insights_service import InsightsService
 from app.models.student import Student, CourseGrade
+from app.models.deadline import Deadline
 from app.config import MIN_GRADE, MAX_GRADE, PASSING_THRESHOLD
 
 # Set directories relative to this file
@@ -18,6 +21,10 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 storage = JsonStorage()
 manager = StudentManager(storage)
 manager.load()
+
+# Initialize Deadline Storage
+deadline_storage = DeadlineStorage()
+_deadlines: list[Deadline] = deadline_storage.load()
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +397,142 @@ def save_data():
     """Save data to the persistence layer."""
     success = manager.save()
     return jsonify({"success": success})
+
+
+# ---------------------------------------------------------------------------
+# Deadlines — CRUD + upcoming
+# ---------------------------------------------------------------------------
+
+def _deadline_payload(d: Deadline, today: date) -> dict:
+    """Serialize a Deadline to the JSON shape sent to the frontend."""
+    try:
+        due = datetime.strptime(d.due_date, "%Y-%m-%d").date()
+        days_left = (due - today).days
+    except ValueError:
+        days_left = None
+
+    urgency = "none"
+    if days_left is not None:
+        if days_left < 0:
+            urgency = "overdue"
+        elif days_left <= 1:
+            urgency = "critical"
+        elif days_left <= 3:
+            urgency = "high"
+        elif days_left <= 7:
+            urgency = "medium"
+
+    return {
+        "id": d.id,
+        "title": d.title,
+        "type": d.type,
+        "due_date": d.due_date,
+        "course": d.course,
+        "description": d.description,
+        "student_id": d.student_id,
+        "days_left": days_left,
+        "urgency": urgency,
+    }
+
+
+@app.route('/api/deadlines', methods=['GET'])
+def get_deadlines():
+    """Retrieve all deadlines."""
+    today = date.today()
+    return jsonify([_deadline_payload(d, today) for d in _deadlines])
+
+
+@app.route('/api/deadlines/upcoming', methods=['GET'])
+def get_upcoming_deadlines():
+    """Return deadlines due within 7 days (plus overdue), sorted by due date."""
+    today = date.today()
+    result = []
+    for d in _deadlines:
+        p = _deadline_payload(d, today)
+        if p["days_left"] is not None and p["days_left"] <= 7:
+            result.append(p)
+    result.sort(key=lambda x: x["due_date"])
+    return jsonify(result)
+
+
+@app.route('/api/deadlines', methods=['POST'])
+def add_deadline():
+    """Add a new deadline."""
+    data = request.json or {}
+    title    = (data.get("title") or "").strip()
+    due_date = (data.get("due_date") or "").strip()
+    if not title:
+        return jsonify({"success": False, "error": "Title is required."}), 400
+    if not due_date:
+        return jsonify({"success": False, "error": "Due date is required."}), 400
+    try:
+        datetime.strptime(due_date, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"success": False, "error": "Due date must be YYYY-MM-DD."}), 400
+
+    d = Deadline(
+        title=title,
+        due_date=due_date,
+        deadline_type=data.get("type", "assignment"),
+        course=data.get("course", ""),
+        description=data.get("description", ""),
+        student_id=data.get("student_id") or None,
+    )
+    _deadlines.append(d)
+    if not deadline_storage.save(_deadlines):
+        _deadlines.pop()
+        return jsonify({"success": False, "error": "Could not save deadline."}), 500
+    return jsonify({"success": True, "deadline": _deadline_payload(d, date.today())})
+
+
+@app.route('/api/deadlines/<deadline_id>', methods=['PUT'])
+def update_deadline(deadline_id):
+    """Update an existing deadline by its UUID."""
+    d = next((x for x in _deadlines if x.id == deadline_id), None)
+    if d is None:
+        return jsonify({"success": False, "error": "Deadline not found."}), 404
+
+    data     = request.json or {}
+    title    = (data.get("title") or "").strip()
+    due_date = (data.get("due_date") or "").strip()
+    if not title:
+        return jsonify({"success": False, "error": "Title is required."}), 400
+    if not due_date:
+        return jsonify({"success": False, "error": "Due date is required."}), 400
+    try:
+        datetime.strptime(due_date, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"success": False, "error": "Due date must be YYYY-MM-DD."}), 400
+
+    # Snapshot for rollback
+    old = d.to_dict()
+    idx = _deadlines.index(d)
+    _deadlines[idx] = Deadline(
+        title=title,
+        due_date=due_date,
+        deadline_type=data.get("type", d.type),
+        course=data.get("course", d.course),
+        description=data.get("description", d.description),
+        student_id=data.get("student_id") or None,
+        deadline_id=deadline_id,
+    )
+    if not deadline_storage.save(_deadlines):
+        _deadlines[idx] = Deadline.from_dict(old)
+        return jsonify({"success": False, "error": "Could not save update."}), 500
+    return jsonify({"success": True, "deadline": _deadline_payload(_deadlines[idx], date.today())})
+
+
+@app.route('/api/deadlines/<deadline_id>', methods=['DELETE'])
+def delete_deadline(deadline_id):
+    """Delete a deadline by its UUID."""
+    idx = next((i for i, x in enumerate(_deadlines) if x.id == deadline_id), None)
+    if idx is None:
+        return jsonify({"success": False, "error": "Deadline not found."}), 404
+    removed = _deadlines.pop(idx)
+    if not deadline_storage.save(_deadlines):
+        _deadlines.insert(idx, removed)
+        return jsonify({"success": False, "error": "Could not save deletion."}), 500
+    return jsonify({"success": True})
 
 
 if __name__ == '__main__':

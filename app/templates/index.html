@@ -34,6 +34,11 @@
                 <i class="fa-solid fa-chart-pie"></i>
                 <span>Analytics</span>
             </button>
+            <button class="nav-item" data-tab="deadlines">
+                <i class="fa-solid fa-calendar-check"></i>
+                <span>Deadlines</span>
+                <span id="deadline-nav-badge" class="nav-badge hidden"></span>
+            </button>
         </nav>
         <div class="sidebar-footer">
             <span id="connection-status" class="status-pill status-connected">
@@ -138,6 +143,17 @@
                 </div>
             </div>
 
+            <!-- Deadline Reminders Panel -->
+            <div id="deadline-reminder-panel" class="card glass-card deadline-reminder-card" style="display:none;">
+                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                    <h2><i class="fa-solid fa-bell" style="color:var(--warning);"></i> Upcoming Deadlines</h2>
+                    <span id="deadline-reminder-badge" class="result-badge" style="font-size:0.8rem;"></span>
+                </div>
+                <div class="card-body" style="padding-top:0.5rem;">
+                    <div id="deadline-reminder-list" class="deadline-reminder-list"></div>
+                </div>
+            </div>
+
             <!-- Support Panel -->
             <div id="support-panel" class="card glass-card support-panel-card" style="display:none;">
                 <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
@@ -150,6 +166,49 @@
                     </p>
                     <div id="support-list" class="support-list"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ══ TAB: DEADLINES ══════════════════════════════════════════════ -->
+        <div class="tab-page" id="tab-deadlines">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Deadlines</h1>
+                    <p class="page-sub">Track assignments, exams, and project due dates</p>
+                </div>
+                <button id="btn-open-deadline-modal" class="btn btn-primary">
+                    <i class="fa-solid fa-plus"></i> Add Deadline
+                </button>
+            </div>
+
+            <!-- Deadlines table -->
+            <div class="card glass-card table-card" id="deadlines-table-card">
+                <div class="table-container">
+                    <table class="students-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Type</th>
+                                <th>Course</th>
+                                <th>Due Date</th>
+                                <th>Status</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deadlines-table-body">
+                            <tr>
+                                <td colspan="6" class="table-loading">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> Loading deadlines…
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="deadlines-empty-state" class="table-empty hidden">
+                <div class="table-empty-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                <p>No deadlines yet. Click <strong>Add Deadline</strong> to get started!</p>
             </div>
         </div>
 
@@ -528,6 +587,68 @@
                         <i class="fa-solid fa-trash-can"></i> Delete
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ Add / Edit Deadline Modal ══════════════════════════════════════ -->
+    <div id="deadline-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal animate-scale">
+            <div class="modal-header">
+                <h3 id="deadline-modal-title"><i class="fa-solid fa-calendar-plus"></i> Add Deadline</h3>
+                <button class="btn-close" id="deadline-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="deadline-form">
+                    <input type="hidden" id="deadline-edit-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="deadline-title">Title <span class="req">*</span></label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-pen input-icon"></i>
+                                <input type="text" id="deadline-title" placeholder="e.g. Midterm Exam" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="deadline-type">Type</label>
+                            <div class="input-wrapper select-wrapper">
+                                <i class="fa-solid fa-tag input-icon"></i>
+                                <select id="deadline-type">
+                                    <option value="assignment">Assignment</option>
+                                    <option value="exam">Exam</option>
+                                    <option value="project">Project</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="deadline-course">Course</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-book input-icon"></i>
+                                <input type="text" id="deadline-course" placeholder="e.g. CS 101">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="deadline-due-date">Due Date <span class="req">*</span></label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-calendar-days input-icon"></i>
+                                <input type="date" id="deadline-due-date" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="deadline-description">Description</label>
+                        <textarea id="deadline-description" rows="2" placeholder="Optional details…"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="deadline-cancel-btn" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="deadline-submit-btn">
+                            <i class="fa-solid fa-plus"></i> Add Deadline
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

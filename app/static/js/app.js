@@ -3,14 +3,16 @@
    ========================================================================== */
 
 const API = {
-    students: '/api/students',
-    stats:    '/api/stats',
-    search:   '/api/search',
-    filter:   '/api/filter',
-    sort:     '/api/sort',
-    save:     '/api/save',
-    config:   '/api/config',
-    insights: '/api/insights',
+    students:          '/api/students',
+    stats:             '/api/stats',
+    search:            '/api/search',
+    filter:            '/api/filter',
+    sort:              '/api/sort',
+    save:              '/api/save',
+    config:            '/api/config',
+    insights:          '/api/insights',
+    deadlines:         '/api/deadlines',
+    deadlinesUpcoming: '/api/deadlines/upcoming',
 };
 
 // Grade bounds — updated from /api/config on load; defaults match config.py.
@@ -116,6 +118,7 @@ function initNav() {
             document.getElementById('sidebar')?.classList.remove('open');
             // Lazy-load analytics when the tab becomes visible
             if (tab === 'analytics') renderAnalyticsCharts();
+            if (tab === 'deadlines') loadDeadlines();
         });
     });
 
@@ -1107,6 +1110,291 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAnalyticsCharts();
     });
 
+    // ── Deadlines tab ─────────────────────────────────────────────────────
+    document.getElementById('btn-open-deadline-modal')?.addEventListener('click', () => openDeadlineModal());
+    document.getElementById('deadline-modal-close')?.addEventListener('click', closeDeadlineModal);
+    document.getElementById('deadline-cancel-btn')?.addEventListener('click', closeDeadlineModal);
+    document.getElementById('deadline-modal')?.addEventListener('click', e => { if (e.target.id === 'deadline-modal') closeDeadlineModal(); });
+    document.getElementById('deadline-form')?.addEventListener('submit', submitDeadlineForm);
+
+    // Escape key — also close deadline modal
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !document.getElementById('deadline-modal')?.classList.contains('hidden')) {
+            closeDeadlineModal();
+        }
+    }, true);
+
     // ── Initial load ──────────────────────────────────────────────────────
-    loadConfig().then(() => loadStudents());
+    loadConfig().then(() => {
+        loadStudents();
+        loadDeadlineReminders();
+    });
 });
+
+/* ==========================================================================
+   DEADLINE HELPERS
+   ========================================================================== */
+
+const URGENCY_CONFIG = {
+    overdue:  { label: 'Overdue',    cls: 'deadline-overdue',  icon: 'fa-circle-exclamation' },
+    critical: { label: 'Due today/tomorrow', cls: 'deadline-critical', icon: 'fa-fire' },
+    high:     { label: 'Due in 3 days', cls: 'deadline-high',  icon: 'fa-triangle-exclamation' },
+    medium:   { label: 'Due this week', cls: 'deadline-medium', icon: 'fa-clock' },
+    none:     { label: 'Upcoming',   cls: 'deadline-none',     icon: 'fa-calendar' },
+};
+
+const TYPE_ICON = {
+    assignment: 'fa-file-pen',
+    exam:       'fa-graduation-cap',
+    project:    'fa-diagram-project',
+    other:      'fa-tag',
+};
+
+function formatDaysLeft(days) {
+    if (days === null || days === undefined) return '—';
+    if (days < 0)  return `${Math.abs(days)}d overdue`;
+    if (days === 0) return 'Due today';
+    if (days === 1) return 'Due tomorrow';
+    return `${days}d left`;
+}
+
+function formatDate(isoStr) {
+    if (!isoStr) return '—';
+    const [y, m, d] = isoStr.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
+}
+
+/* ==========================================================================
+   DEADLINE REMINDER PANEL (Dashboard)
+   ========================================================================== */
+async function loadDeadlineReminders() {
+    try {
+        const res = await fetch(API.deadlinesUpcoming);
+        if (!res.ok) return;
+        const items = await res.json();
+
+        const panel = document.getElementById('deadline-reminder-panel');
+        const list  = document.getElementById('deadline-reminder-list');
+        const badge = document.getElementById('deadline-reminder-badge');
+        const navBadge = document.getElementById('deadline-nav-badge');
+        if (!panel || !list) return;
+
+        if (items.length === 0) {
+            panel.style.display = 'none';
+            if (navBadge) { navBadge.textContent = ''; navBadge.classList.add('hidden'); }
+            return;
+        }
+
+        panel.style.display = '';
+        if (badge) badge.textContent = `${items.length} reminder${items.length !== 1 ? 's' : ''}`;
+        if (navBadge) {
+            navBadge.textContent = items.length;
+            navBadge.classList.remove('hidden');
+        }
+
+        list.innerHTML = '';
+        items.forEach(d => {
+            const cfg  = URGENCY_CONFIG[d.urgency] || URGENCY_CONFIG.none;
+            const icon = TYPE_ICON[d.type] || TYPE_ICON.other;
+            const row  = document.createElement('div');
+            row.className = `deadline-reminder-item ${cfg.cls}`;
+            row.innerHTML = `
+                <div class="dl-reminder-icon"><i class="fa-solid ${icon}"></i></div>
+                <div class="dl-reminder-info">
+                    <span class="dl-reminder-title">${escapeHtml(d.title)}</span>
+                    ${d.course ? `<span class="dl-reminder-course">${escapeHtml(d.course)}</span>` : ''}
+                </div>
+                <div class="dl-reminder-right">
+                    <span class="dl-days-badge ${cfg.cls}">${formatDaysLeft(d.days_left)}</span>
+                    <span class="dl-date-str">${formatDate(d.due_date)}</span>
+                </div>`;
+            list.appendChild(row);
+        });
+
+        // Notify once per session for 7/3/1-day thresholds
+        const notifyKey = 'dl_notified_' + new Date().toDateString();
+        const notified  = JSON.parse(sessionStorage.getItem(notifyKey) || '[]');
+        items.forEach(d => {
+            if (notified.includes(d.id)) return;
+            if (d.urgency === 'overdue') {
+                showToast(`🚨 Overdue: "${d.title}" was due ${Math.abs(d.days_left)}d ago.`, 'error');
+                notified.push(d.id);
+            } else if (d.urgency === 'critical') {
+                showToast(`🔥 Due ${d.days_left === 0 ? 'today' : 'tomorrow'}: "${d.title}"`, 'error');
+                notified.push(d.id);
+            } else if (d.urgency === 'high' && d.days_left <= 3) {
+                showToast(`⚠️ Due in ${d.days_left} day${d.days_left !== 1 ? 's' : ''}: "${d.title}"`, 'info');
+                notified.push(d.id);
+            } else if (d.urgency === 'medium' && d.days_left <= 7) {
+                showToast(`📅 Reminder: "${d.title}" due in ${d.days_left} days.`, 'info');
+                notified.push(d.id);
+            }
+        });
+        sessionStorage.setItem(notifyKey, JSON.stringify(notified));
+
+    } catch (_) { /* non-fatal */ }
+}
+
+/* ==========================================================================
+   DEADLINE TABLE (Deadlines tab)
+   ========================================================================== */
+async function loadDeadlines() {
+    try {
+        const res = await fetch(API.deadlines);
+        if (!res.ok) return;
+        const items = await res.json();
+        renderDeadlinesTable(items);
+    } catch (_) {
+        showToast('Failed to load deadlines.', 'error');
+    }
+}
+
+function renderDeadlinesTable(items) {
+    const tbody = document.getElementById('deadlines-table-body');
+    const empty = document.getElementById('deadlines-empty-state');
+    const card  = document.getElementById('deadlines-table-card');
+    if (!tbody) return;
+
+    if (!items || items.length === 0) {
+        tbody.innerHTML = '';
+        if (empty) empty.classList.remove('hidden');
+        if (card)  card.classList.add('hidden');
+        return;
+    }
+    if (empty) empty.classList.add('hidden');
+    if (card)  card.classList.remove('hidden');
+
+    tbody.innerHTML = '';
+    // Sort: overdue first, then by date asc
+    items.sort((a, b) => {
+        if (a.due_date < b.due_date) return -1;
+        if (a.due_date > b.due_date) return 1;
+        return 0;
+    });
+
+    items.forEach(d => {
+        const cfg   = URGENCY_CONFIG[d.urgency] || URGENCY_CONFIG.none;
+        const ticon = TYPE_ICON[d.type] || TYPE_ICON.other;
+        const tr    = document.createElement('tr');
+        tr.dataset.deadlineId = d.id;
+
+        tr.innerHTML = `
+            <td>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <i class="fa-solid ${ticon}" style="color:var(--primary);font-size:0.85rem;"></i>
+                    <span>${escapeHtml(d.title)}</span>
+                </div>
+                ${d.description ? `<span class="name-subtext">${escapeHtml(d.description)}</span>` : ''}
+            </td>
+            <td><span class="badge badge-type-${escapeHtml(d.type)}">${escapeHtml(d.type)}</span></td>
+            <td style="color:var(--text-muted);font-size:0.875rem;">${d.course ? escapeHtml(d.course) : '<span style="color:var(--text-dim)">—</span>'}</td>
+            <td style="font-size:0.875rem;">${formatDate(d.due_date)}</td>
+            <td><span class="deadline-status-badge ${cfg.cls}">${formatDaysLeft(d.days_left)}</span></td>
+            <td class="text-right">
+                <div class="actions-cell">
+                    <button class="btn-action btn-action-edit"   title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn-action btn-action-delete" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            </td>`;
+
+        tr.querySelector('.btn-action-edit').addEventListener('click',   () => openDeadlineModal(d));
+        tr.querySelector('.btn-action-delete').addEventListener('click', () => deleteDeadline(d.id, d.title));
+
+        tbody.appendChild(tr);
+    });
+}
+
+/* ==========================================================================
+   DEADLINE MODAL (add / edit)
+   ========================================================================== */
+function openDeadlineModal(d = null) {
+    const modal     = document.getElementById('deadline-modal');
+    const titleEl   = document.getElementById('deadline-modal-title');
+    const submitBtn = document.getElementById('deadline-submit-btn');
+    const editId    = document.getElementById('deadline-edit-id');
+    if (!modal) return;
+
+    // Reset form
+    document.getElementById('deadline-title').value       = d ? d.title       : '';
+    document.getElementById('deadline-type').value        = d ? d.type        : 'assignment';
+    document.getElementById('deadline-course').value      = d ? d.course      : '';
+    document.getElementById('deadline-due-date').value    = d ? d.due_date    : '';
+    document.getElementById('deadline-description').value = d ? d.description : '';
+    editId.value = d ? d.id : '';
+
+    if (d) {
+        titleEl.innerHTML  = '<i class="fa-solid fa-calendar-pen"></i> Edit Deadline';
+        submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    } else {
+        titleEl.innerHTML  = '<i class="fa-solid fa-calendar-plus"></i> Add Deadline';
+        submitBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Deadline';
+    }
+
+    modal.classList.remove('hidden');
+    setTimeout(() => document.getElementById('deadline-title')?.focus(), 60);
+}
+
+function closeDeadlineModal() {
+    document.getElementById('deadline-modal')?.classList.add('hidden');
+}
+
+async function submitDeadlineForm(e) {
+    e.preventDefault();
+    const editId = document.getElementById('deadline-edit-id')?.value;
+    const title  = (document.getElementById('deadline-title')?.value || '').trim();
+    const dueDate = document.getElementById('deadline-due-date')?.value || '';
+
+    if (!title) { showToast('Title is required.', 'error'); return; }
+    if (!dueDate) { showToast('Due date is required.', 'error'); return; }
+
+    const payload = {
+        title,
+        due_date:    dueDate,
+        type:        document.getElementById('deadline-type')?.value || 'assignment',
+        course:      (document.getElementById('deadline-course')?.value || '').trim(),
+        description: (document.getElementById('deadline-description')?.value || '').trim(),
+    };
+
+    const isEdit = !!editId;
+    const url    = isEdit ? `${API.deadlines}/${editId}` : API.deadlines;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload),
+        });
+        if (!res.ok) { showToast(`Server error (${res.status}).`, 'error'); return; }
+        const data = await res.json();
+        if (data.success) {
+            showToast(isEdit ? '✏️ Deadline updated.' : '✅ Deadline added.', 'success');
+            closeDeadlineModal();
+            loadDeadlines();
+            loadDeadlineReminders();
+        } else {
+            showToast(data.error || 'Failed to save deadline.', 'error');
+        }
+    } catch (_) {
+        showToast('Network error. Could not save deadline.', 'error');
+    }
+}
+
+async function deleteDeadline(id, title) {
+    if (!confirm(`Delete deadline "${title}"?`)) return;
+    try {
+        const res = await fetch(`${API.deadlines}/${id}`, { method: 'DELETE' });
+        if (!res.ok) { showToast(`Server error (${res.status}).`, 'error'); return; }
+        const data = await res.json();
+        if (data.success) {
+            showToast('🗑️ Deadline removed.', 'success');
+            loadDeadlines();
+            loadDeadlineReminders();
+        } else {
+            showToast(data.error || 'Failed to delete deadline.', 'error');
+        }
+    } catch (_) {
+        showToast('Network error. Could not delete deadline.', 'error');
+    }
+}
