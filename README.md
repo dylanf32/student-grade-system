@@ -1,124 +1,88 @@
-# 📚 Student Grade Management System
+# Student Grade Management System
 
-A **modular, scalable, and clean** console-based application for managing student grades built in Python.
+A Python application with a Flask web dashboard and a console interface for managing student grades and academic profiles.
 
----
-<p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-  <img src="https://img.shields.io/badge/status-active-brightgreen.svg" alt="Status">
-  <img src="https://img.shields.io/badge/platform-Web%20%7C%20Console-lightgrey.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/built%20with-Python-3776AB?logo=python&logoColor=white" alt="Built With Python">
-  <img src="https://img.shields.io/badge/framework-Flask-000000?logo=flask&logoColor=white" alt="Framework Flask">
-</p>
+This repository is Dylan Ferrer's extension of [samin-developer/student-grade-system](https://github.com/samin-developer/student-grade-system), developed for the IBM Bob hackathon. The original project and MIT attribution are preserved.
 
+**Stack:** Python · Flask · HTML/CSS/JavaScript · JSON persistence
 
-## 📂 Project Structure
+## Features
 
-```
-student-grade-system/
-│
-├── main.py                          # Entry point — wires all layers
-│
-├── app/                             # Application package
-│   ├── __init__.py
-│   ├── config.py                    # Central configuration constants
-│   │
-│   ├── models/                      # Data layer
-│   │   ├── __init__.py
-│   │   └── student.py               # Student entity class
-│   │
-│   ├── validators/                  # Validation layer
-│   │   ├── __init__.py
-│   │   └── input_validator.py       # Reusable validation rules
-│   │
-│   ├── storage/                     # Persistence layer (pluggable)
-│   │   ├── __init__.py
-│   │   ├── base_storage.py          # Abstract interface
-│   │   └── json_storage.py          # JSON file implementation
-│   │
-│   ├── services/                    # Business logic layer
-│   │   ├── __init__.py
-│   │   ├── student_manager.py       # CRUD + search + sort
-│   │   └── statistics_service.py    # Grade statistics computation
-│   │
-│   └── ui/                          # Presentation layer
-│       ├── __init__.py
-│       ├── colors.py                # ANSI color utilities
-│       ├── display.py               # Console rendering helpers
-│       ├── input_helpers.py         # Safe input with validation
-│       └── handlers.py              # Menu option handlers
-│
-├── tests/                           # Unit tests
-│   ├── __init__.py
-│   ├── test_student.py
-│   ├── test_student_manager.py
-│   ├── test_statistics.py
-│   ├── test_validators.py
-│   └── test_storage.py
-│
-├── data/                            # Persistent storage (auto-created)
-│   └── students.json
-│
-└── README.md
+- Add, update, remove, search, filter, and sort students.
+- Store email, major, academic year, GPA, courses, and academic notes.
+- View grade summaries, passing rates, and GPA, standing, and major distributions.
+- Use stable UUIDs for web update/delete requests.
+- Save JSON through a temporary file and atomic replacement.
+- Use either the web dashboard or console menus.
+
+Academic standing and GPA calculations are application-defined examples; they do not represent a university's official grading policy.
+
+## Setup
+
+```powershell
+git clone https://github.com/dylanf32/student-grade-system.git
+cd student-grade-system
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 ```
 
----
+On macOS/Linux, activate with `source .venv/bin/activate`. The source uses Python 3.10+ type syntax.
 
-## 🏗️ Architecture Principles
+## Run
 
-| Principle | How It's Applied |
-|---|---|
-| **Separation of Concerns** | Models, Services, Storage, UI, and Validators are in separate packages |
-| **Dependency Injection** | `StudentManager` receives a `BaseStorage` — swap JSON for SQLite without touching business logic |
-| **Single Responsibility** | Each class/module does exactly one thing |
-| **Open/Closed** | Add new storage backends by subclassing `BaseStorage`; add features by adding a handler |
-| **No Side Effects in Services** | Service layer raises exceptions, never prints — UI handles all output |
-| **Centralized Config** | All constants live in `config.py` |
-| **Testability** | Services are tested with `FakeStorage` — zero disk I/O in unit tests |
-
----
-
-## 🚀 How to Run
+### Web dashboard
 
 ```bash
-# Run the application
+python run_web.py
+```
+
+Open [http://localhost:5000](http://localhost:5000). The `PORT` environment variable can change the port. The script binds to `0.0.0.0` and does not implement authentication; use it as a local demonstration with sample data.
+
+### Console
+
+```bash
 python main.py
+```
 
-# Run all tests
-python -m pytest tests/ -v
+Follow the menu to manage students, inspect statistics, and save data.
 
-# Or with unittest
+## Storage
+
+Records are stored in `data/students.json`. The repository includes starter records. Back up that file before experimenting if you want to keep its current contents. JSON persistence is designed for this demonstration; atomic writes alone do not provide concurrent multi-worker database semantics.
+
+## Architecture
+
+| Path | Responsibility |
+| --- | --- |
+| [run_web.py](run_web.py) | Flask routes and web API |
+| [main.py](main.py) | Console entry point |
+| `app/models/` | Student and course records |
+| `app/services/` | Student operations and summary statistics |
+| `app/storage/` | Storage interface and JSON implementation |
+| `app/validators/` | Input validation |
+| `app/ui/` | Console display and input |
+| `app/templates/`, `app/static/` | Web dashboard |
+| `tests/` | Model, service, storage, validation, and regression tests |
+
+## Tests
+
+The included unittest suite can run without installing pytest:
+
+```bash
 python -m unittest discover -s tests -v
 ```
 
----
+Alternatively, install pytest separately and run `python -m pytest tests/ -v`.
 
-## 📋 Features
+## Hackathon development
 
-| # | Feature | Menu Option |
-|---|---|---|
-| 1 | ➕ Add Student (with name + grade validation) | 1 |
-| 2 | ➖ Remove Student by index | 2 |
-| 3 | ✏️ Update Grade | 3 |
-| 4 | 📄 View All Students (color-coded table) | 4 |
-| 5 | 🔍 Search by Name (case-insensitive) | 5 |
-| 6 | 📊 Statistics (avg, max, min, pass/fail) | 6 |
-| 7 | 🔃 Sort by Grade (asc/desc) | 7 |
-| 8 | 💾 Save to JSON | 8 |
-| 9 | 🚪 Exit (auto-saves) | 9 |
+- [Hackathon plan](HACKATHON_PLAN.md): intended scope and project planning.
+- [AI prompt log](ai-prompts/README.md): IBM Bob prompts and development sessions.
+- [Code audit plan](code-audit-fixes-plan.md): recorded audit findings and fixes.
 
----
+Plans describe proposed work; the implemented behavior is defined by the source. AI assistance is documented in the prompt log.
 
-## 🧪 Test Coverage
+## License and attribution
 
-- **test_student.py** — Model creation, validation, serialization, equality
-- **test_student_manager.py** — CRUD, search, sort, persistence (with FakeStorage)
-- **test_statistics.py** — Compute, accessors, empty-list edge cases
-- **test_validators.py** — Name, grade, index validation + boundary cases
-- **test_storage.py** — JSON roundtrip, missing file, corrupted file handling
-
-
-## License
-
-Distributed under the MIT License. See the [LICENSE](LICENSE) file for details.
+Distributed under the [MIT License](LICENSE). Original project: [samin-developer/student-grade-system](https://github.com/samin-developer/student-grade-system). Extensions in this fork are maintained by [Dylan Ferrer](https://github.com/dylanf32).
