@@ -86,12 +86,12 @@ function escapeHtml(text) {
    CHART.JS GLOBAL DEFAULTS
    ========================================================================== */
 function applyChartDefaults() {
-    Chart.defaults.color          = '#9ca3af';
-    Chart.defaults.borderColor    = 'rgba(255,255,255,0.07)';
+    Chart.defaults.color          = '#a1a1b5';
+    Chart.defaults.borderColor    = 'rgba(255,255,255,0.06)';
     Chart.defaults.font.family    = "'Inter', sans-serif";
-    Chart.defaults.plugins.legend.labels.color = '#9ca3af';
+    Chart.defaults.plugins.legend.labels.color    = '#a1a1b5';
     Chart.defaults.plugins.legend.labels.boxWidth = 12;
-    Chart.defaults.plugins.legend.labels.padding  = 16;
+    Chart.defaults.plugins.legend.labels.padding  = 18;
 }
 
 function destroyChart(key) {
@@ -170,21 +170,20 @@ async function loadStudents() {
 function renderStudentTable(students) {
     const tbody    = document.getElementById('students-table-body');
     const subtitle = document.getElementById('table-subtitle');
+    const emptyState = document.getElementById('students-empty-state');
     if (!tbody) return;
 
     if (!students || students.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="9" class="table-loading" style="color:var(--text-dim);">
-                    <i class="fa-solid fa-inbox" style="font-size:2rem;display:block;margin-bottom:0.75rem;opacity:0.3;"></i>
-                    No students found.
-                </td>
-            </tr>`;
+        tbody.innerHTML = '';
         if (subtitle) subtitle.textContent = '0 records';
+        if (emptyState) emptyState.classList.remove('hidden');
+        document.querySelector('.table-card')?.classList.add('hidden');
         return;
     }
 
-    if (subtitle) subtitle.textContent = `${students.length} record(s)`;
+    if (emptyState) emptyState.classList.add('hidden');
+    document.querySelector('.table-card')?.classList.remove('hidden');
+    if (subtitle) subtitle.textContent = `${students.length} student${students.length !== 1 ? 's' : ''}`;
     tbody.innerHTML = '';
 
     students.forEach(s => {
@@ -193,6 +192,7 @@ function renderStudentTable(students) {
         const gpaColor    = getGpaColor(s.gpa);
         const gpaDisplay  = s.gpa != null ? s.gpa.toFixed(2) : '—';
         const standingBadge = getStandingBadgeClass(s.standing);
+        const gradeBarPct = Math.min(100, Math.max(0, s.grade));
 
         const tr = document.createElement('tr');
         tr.dataset.index     = s.index;
@@ -207,7 +207,14 @@ function renderStudentTable(students) {
             </td>
             <td style="color:var(--text-muted);font-size:0.875rem;">${s.major ? escapeHtml(s.major) : '<span style="color:var(--text-dim)">—</span>'}</td>
             <td style="color:var(--text-muted);font-size:0.875rem;">${s.academic_year ? escapeHtml(s.academic_year) : '<span style="color:var(--text-dim)">—</span>'}</td>
-            <td class="grade-cell" style="color:${gradeColor};">${s.grade}</td>
+            <td>
+                <div class="grade-cell-wrap">
+                    <span class="grade-num" style="color:${gradeColor};">${s.grade}</span>
+                    <div class="grade-bar-bg">
+                        <div class="grade-bar-fill" style="width:0%;background:${gradeColor};" data-pct="${gradeBarPct}"></div>
+                    </div>
+                </div>
+            </td>
             <td><span class="gpa-pill" style="color:${gpaColor};">${gpaDisplay}</span></td>
             <td><span class="badge ${standingBadge}">${s.standing || '—'}</span></td>
             <td class="text-right">
@@ -223,6 +230,13 @@ function renderStudentTable(students) {
         tr.querySelector('.btn-action-delete').addEventListener('click', () => openDeleteModal(s.student_id, s.name));
 
         tbody.appendChild(tr);
+    });
+
+    // Animate grade bars into view after a short delay
+    requestAnimationFrame(() => {
+        tbody.querySelectorAll('.grade-bar-fill').forEach(bar => {
+            bar.style.width = bar.dataset.pct + '%';
+        });
     });
 }
 
@@ -310,14 +324,14 @@ function renderDashboardStandingDonut(standingDist) {
     section.style.display = '';
 
     const STANDING_COLORS = {
-        "Dean's List":        '#a78bfa',
-        'Good Standing':      '#10b981',
-        'Satisfactory':       '#06b6d4',
-        'Academic Warning':   '#f59e0b',
-        'Academic Probation': '#f43f5e',
+        "Dean's List":        '#c4b5fd',
+        'Good Standing':      '#34d399',
+        'Satisfactory':       '#38bdf8',
+        'Academic Warning':   '#fbbf24',
+        'Academic Probation': '#f87171',
     };
-    const bg = labels.map(l => (STANDING_COLORS[l] || '#6366f1') + 'cc');
-    const border = labels.map(l => STANDING_COLORS[l] || '#6366f1');
+    const bg = labels.map(l => (STANDING_COLORS[l] || '#a78bfa') + 'cc');
+    const border = labels.map(l => STANDING_COLORS[l] || '#a78bfa');
 
     destroyChart('dashStanding');
     charts.dashStanding = new Chart(canvas, {
@@ -535,11 +549,13 @@ async function loadInsights() {
         list.innerHTML = '';
         flagged.forEach(item => {
             const row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.75rem;background:var(--surface, rgba(255,255,255,0.03));border-radius:6px;border-left:3px solid var(--warning);';
+            row.className = 'support-item';
             row.innerHTML = `
-                <span style="font-weight:600;min-width:140px;">${escapeHtml(item.name)}</span>
-                <span style="font-weight:700;color:var(--danger);min-width:48px;">${item.grade}</span>
-                <span style="color:var(--text-muted);font-size:0.85rem;">${escapeHtml(item.reason)}</span>`;
+                <div>
+                    <span class="support-item-name">${escapeHtml(item.name)}</span>
+                    <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.5rem;">${escapeHtml(item.reason)}</span>
+                </div>
+                <span class="support-item-grade">${item.grade}</span>`;
             list.appendChild(row);
         });
     } catch (_) { /* non-fatal */ }

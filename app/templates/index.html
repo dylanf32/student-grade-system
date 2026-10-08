@@ -65,8 +65,17 @@
                     <p class="page-sub">Live snapshot of your class performance</p>
                 </div>
                 <button id="btn-save-db" class="btn btn-secondary">
-                    <i class="fa-solid fa-floppy-disk"></i> Save Database
+                    <i class="fa-solid fa-floppy-disk"></i> Save
                 </button>
+            </div>
+
+            <!-- Welcome banner -->
+            <div class="welcome-banner">
+                <span class="welcome-emoji">🎓</span>
+                <div class="welcome-text">
+                    <h2>Welcome back!</h2>
+                    <p>Here's a quick overview of how your class is doing today.</p>
+                </div>
             </div>
 
             <!-- Stat cards -->
@@ -260,6 +269,12 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Empty state (shown by JS when list is empty) -->
+            <div id="students-empty-state" class="table-empty hidden">
+                <div class="table-empty-icon"><i class="fa-solid fa-user-group"></i></div>
+                <p>No students yet. Click <strong>Add Student</strong> to get started!</p>
             </div>
         </div>
 
