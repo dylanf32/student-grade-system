@@ -16,25 +16,23 @@ const API = {
 // Grade bounds — updated from /api/config on load; defaults match config.py.
 let minGrade = 0;
 let maxGrade = 100;
-let passingThreshold = 60;  // updated from /api/config; drives badge labels
+let passingThreshold = 60;
+
+// Chart.js instances (kept so we can destroy before recreating)
+const charts = {};
 
 /* ==========================================================================
    TOAST NOTIFICATION SYSTEM
    ========================================================================== */
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
-    if (!container) { console.warn('Missing element: toast-container'); return; }
+    if (!container) return;
+    const iconMap = { success: 'fa-circle-check', error: 'fa-circle-exclamation', info: 'fa-circle-info' };
     const toast = document.createElement('div');
-    const iconMap = {
-        success: 'fa-circle-check',
-        error:   'fa-circle-exclamation',
-        info:    'fa-circle-info',
-    };
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `<i class="fa-solid ${iconMap[type] || iconMap.info}"></i> ${message}`;
     container.appendChild(toast);
     const timerId = setTimeout(() => {
-        clearTimeout(timerId);
         if (toast.parentNode) toast.parentNode.removeChild(toast);
     }, 5000);
     toast.dataset.timerId = timerId;
@@ -62,10 +60,10 @@ function getGradeColor(grade) {
 function getStandingBadgeClass(standing) {
     if (!standing) return 'badge-satisfactory';
     const s = standing.toLowerCase();
-    if (s.includes("dean")) return 'badge-deans-list';
-    if (s.includes("good")) return 'badge-good-standing';
-    if (s.includes("satisf")) return 'badge-satisfactory';
-    if (s.includes("warning")) return 'badge-warning';
+    if (s.includes('dean'))  return 'badge-deans-list';
+    if (s.includes('good'))  return 'badge-good-standing';
+    if (s.includes('satisf')) return 'badge-satisfactory';
+    if (s.includes('warning')) return 'badge-warning';
     return 'badge-probation';
 }
 
@@ -82,6 +80,75 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.appendChild(document.createTextNode(text));
     return div.innerHTML;
+}
+
+/* ==========================================================================
+   CHART.JS GLOBAL DEFAULTS
+   ========================================================================== */
+function applyChartDefaults() {
+    Chart.defaults.color          = '#9ca3af';
+    Chart.defaults.borderColor    = 'rgba(255,255,255,0.07)';
+    Chart.defaults.font.family    = "'Inter', sans-serif";
+    Chart.defaults.plugins.legend.labels.color = '#9ca3af';
+    Chart.defaults.plugins.legend.labels.boxWidth = 12;
+    Chart.defaults.plugins.legend.labels.padding  = 16;
+}
+
+function destroyChart(key) {
+    if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+}
+
+/* ==========================================================================
+   SIDEBAR NAVIGATION
+   ========================================================================== */
+function initNav() {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            // Active nav
+            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Active tab page
+            document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+            const page = document.getElementById(`tab-${tab}`);
+            if (page) page.classList.add('active');
+            // Close mobile sidebar
+            document.getElementById('sidebar')?.classList.remove('open');
+            // Lazy-load analytics when the tab becomes visible
+            if (tab === 'analytics') renderAnalyticsCharts();
+        });
+    });
+
+    // Mobile hamburger
+    const ham  = document.getElementById('btn-hamburger');
+    const sidebar = document.getElementById('sidebar');
+    if (ham && sidebar) {
+        ham.addEventListener('click', () => sidebar.classList.toggle('open'));
+    }
+}
+
+/* ==========================================================================
+   COUNT-UP ANIMATION
+   ========================================================================== */
+function animateCountUp(el, target, suffix = '', decimals = 0) {
+    if (!el) return;
+    if (target === null || target === undefined || isNaN(target)) {
+        el.textContent = suffix ? target + suffix : (target == null ? '—' : target);
+        return;
+    }
+    const duration = 800;
+    const start    = performance.now();
+    const from     = 0;
+
+    function step(now) {
+        const elapsed  = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease     = 1 - Math.pow(1 - progress, 3); // cubic ease-out
+        const current  = from + (target - from) * ease;
+        el.textContent = current.toFixed(decimals) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
 }
 
 /* ==========================================================================
@@ -103,28 +170,28 @@ async function loadStudents() {
 function renderStudentTable(students) {
     const tbody    = document.getElementById('students-table-body');
     const subtitle = document.getElementById('table-subtitle');
-    if (!tbody || !subtitle) { console.warn('Missing table elements'); return; }
+    if (!tbody) return;
 
     if (!students || students.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="9" class="table-loading" style="color:var(--text-dim);">
                     <i class="fa-solid fa-inbox" style="font-size:2rem;display:block;margin-bottom:0.75rem;opacity:0.3;"></i>
-                    No students found. Add your first student using the form.
+                    No students found.
                 </td>
             </tr>`;
-        subtitle.textContent = '0 records';
+        if (subtitle) subtitle.textContent = '0 records';
         return;
     }
 
-    subtitle.textContent = `Displaying ${students.length} record(s)`;
+    if (subtitle) subtitle.textContent = `${students.length} record(s)`;
     tbody.innerHTML = '';
 
     students.forEach(s => {
         const status      = getGradeStatus(s.grade);
         const gradeColor  = getGradeColor(s.grade);
         const gpaColor    = getGpaColor(s.gpa);
-        const gpaDisplay  = (s.gpa != null) ? s.gpa.toFixed(2) : '—';
+        const gpaDisplay  = s.gpa != null ? s.gpa.toFixed(2) : '—';
         const standingBadge = getStandingBadgeClass(s.standing);
 
         const tr = document.createElement('tr');
@@ -145,44 +212,300 @@ function renderStudentTable(students) {
             <td><span class="badge ${standingBadge}">${s.standing || '—'}</span></td>
             <td class="text-right">
                 <div class="actions-cell">
-                    <button class="btn-action btn-action-view" title="View Profile">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                    <button class="btn-action btn-action-edit" title="Edit Record">
-                        <i class="fa-solid fa-pen-to-square"></i>
-                    </button>
-                    <button class="btn-action btn-action-delete" title="Delete Student">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
+                    <button class="btn-action btn-action-view"   title="View Profile"><i class="fa-solid fa-eye"></i></button>
+                    <button class="btn-action btn-action-edit"   title="Edit Record"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn-action btn-action-delete" title="Delete"><i class="fa-solid fa-trash-can"></i></button>
                 </div>
             </td>`;
 
         tr.querySelector('.btn-action-view').addEventListener('click',   () => openDetailModal(s));
         tr.querySelector('.btn-action-edit').addEventListener('click',   () => openEditModal(s));
-        tr.querySelector('.btn-action-delete').addEventListener('click', () => deleteStudent(s.student_id, s.name));
+        tr.querySelector('.btn-action-delete').addEventListener('click', () => openDeleteModal(s.student_id, s.name));
 
         tbody.appendChild(tr);
     });
 }
 
 /* ==========================================================================
-   FETCH & RENDER: STATISTICS
+   FETCH & RENDER: STATISTICS + CHARTS
    ========================================================================== */
 async function loadStats() {
     try {
         const res = await fetch(API.stats);
-        if (!res.ok) { console.warn(`Stats error: ${res.status}`); return; }
+        if (!res.ok) return;
         const stats = await res.json();
 
-        setTextIfExists('stat-total',    stats.total_students);
-        setTextIfExists('stat-average',  stats.average);
-        setTextIfExists('stat-highest',  stats.highest);
-        setTextIfExists('stat-pass-rate', stats.passing_rate + '%');
-        setTextIfExists('stat-avg-gpa',  stats.avg_gpa != null ? stats.avg_gpa.toFixed(2) : '—');
-        renderGradeDistChart(stats.grade_distribution);
-    } catch (err) {
-        // silently fail
+        animateCountUp(document.getElementById('stat-total'),    stats.total_students);
+        animateCountUp(document.getElementById('stat-average'),  stats.average, '', 1);
+        animateCountUp(document.getElementById('stat-highest'),  stats.highest, '', 1);
+        animateCountUp(document.getElementById('stat-pass-rate'), stats.passing_rate, '%', 1);
+        const gpaEl = document.getElementById('stat-avg-gpa');
+        if (stats.avg_gpa != null) {
+            animateCountUp(gpaEl, stats.avg_gpa, '', 2);
+        } else {
+            if (gpaEl) gpaEl.textContent = '—';
+        }
+
+        renderDashboardGradeChart(stats.grade_distribution);
+        renderDashboardStandingDonut(stats.standing_distribution);
+
+        // Store for analytics tab when it opens
+        window._lastStats = stats;
+
+    } catch (_) { /* silently fail */ }
+}
+
+/* ==========================================================================
+   DASHBOARD CHARTS (Grade bar + Standing donut)
+   ========================================================================== */
+function renderDashboardGradeChart(distribution) {
+    const section = document.getElementById('grade-dist-section');
+    const canvas  = document.getElementById('grade-dist-chart');
+    if (!section || !canvas) return;
+
+    const bands  = ['A (90-100)', 'B (80-89)', 'C (70-79)', 'D (60-69)', 'F (<60)'];
+    const colors = ['#22c55e', '#3b82f6', '#a78bfa', '#f59e0b', '#ef4444'];
+    const counts = bands.map(b => (distribution && distribution[b] != null) ? distribution[b] : 0);
+    const total  = counts.reduce((a, b) => a + b, 0);
+
+    if (total === 0) { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    destroyChart('dashGrade');
+    charts.dashGrade = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: bands,
+            datasets: [{
+                data:            counts,
+                backgroundColor: colors.map(c => c + 'cc'),
+                borderColor:     colors,
+                borderWidth:     1,
+                borderRadius:    6,
+            }],
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: {
+                label: ctx => ` ${ctx.parsed.x} student${ctx.parsed.x !== 1 ? 's' : ''}`,
+            }}},
+            scales: {
+                x: { ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { grid: { display: false } },
+            },
+        },
+    });
+}
+
+function renderDashboardStandingDonut(standingDist) {
+    const section = document.getElementById('standing-donut-section');
+    const canvas  = document.getElementById('standing-donut-chart');
+    if (!section || !canvas || !standingDist) return;
+
+    const labels = Object.keys(standingDist);
+    const data   = Object.values(standingDist);
+    if (data.reduce((a, b) => a + b, 0) === 0) { section.style.display = 'none'; return; }
+    section.style.display = '';
+
+    const STANDING_COLORS = {
+        "Dean's List":        '#a78bfa',
+        'Good Standing':      '#10b981',
+        'Satisfactory':       '#06b6d4',
+        'Academic Warning':   '#f59e0b',
+        'Academic Probation': '#f43f5e',
+    };
+    const bg = labels.map(l => (STANDING_COLORS[l] || '#6366f1') + 'cc');
+    const border = labels.map(l => STANDING_COLORS[l] || '#6366f1');
+
+    destroyChart('dashStanding');
+    charts.dashStanding = new Chart(canvas, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: bg, borderColor: border, borderWidth: 2, hoverOffset: 8 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: { position: 'right', labels: { padding: 12, font: { size: 11 } } },
+                tooltip: { callbacks: {
+                    label: ctx => ` ${ctx.label}: ${ctx.parsed} student${ctx.parsed !== 1 ? 's' : ''}`,
+                }},
+            },
+        },
+    });
+}
+
+/* ==========================================================================
+   ANALYTICS TAB CHARTS
+   ========================================================================== */
+async function renderAnalyticsCharts() {
+    let stats = window._lastStats;
+    if (!stats) {
+        try {
+            const res = await fetch(API.stats);
+            if (!res.ok) return;
+            stats = await res.json();
+            window._lastStats = stats;
+        } catch (_) { return; }
     }
+
+    const total = stats.total_students || 0;
+    const empty = document.getElementById('analytics-empty');
+    const grid  = document.querySelector('.analytics-grid');
+
+    if (total === 0) {
+        if (grid)  grid.style.display  = 'none';
+        if (empty) empty.classList.remove('hidden');
+        return;
+    }
+    if (grid)  grid.style.display  = '';
+    if (empty) empty.classList.add('hidden');
+
+    // Grade distribution bar
+    renderAnalyticsGradeBar(stats.grade_distribution);
+    // Standing donut
+    renderAnalyticsStandingDonut(stats.standing_distribution);
+    // Pass/fail donut
+    renderAnalyticsPassFailDonut(stats.passing_count, stats.failing_count);
+    // Major bar
+    renderAnalyticsMajorBar(stats.major_distribution);
+}
+
+function renderAnalyticsGradeBar(distribution) {
+    const canvas = document.getElementById('analytics-grade-bar');
+    if (!canvas) return;
+    const bands  = ['A (90-100)', 'B (80-89)', 'C (70-79)', 'D (60-69)', 'F (<60)'];
+    const colors = ['#22c55e', '#3b82f6', '#a78bfa', '#f59e0b', '#ef4444'];
+    const counts = bands.map(b => (distribution && distribution[b] != null) ? distribution[b] : 0);
+
+    destroyChart('aGrade');
+    charts.aGrade = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: ['A', 'B', 'C', 'D', 'F'],
+            datasets: [{
+                label: 'Students',
+                data:            counts,
+                backgroundColor: colors.map(c => c + 'bb'),
+                borderColor:     colors,
+                borderWidth:     2,
+                borderRadius:    8,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: {
+                title: (items) => bands[items[0].dataIndex],
+                label:  ctx  => ` ${ctx.parsed.y} student${ctx.parsed.y !== 1 ? 's' : ''}`,
+            }}},
+            scales: {
+                y: { ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                x: { grid: { display: false } },
+            },
+        },
+    });
+}
+
+function renderAnalyticsStandingDonut(standingDist) {
+    const canvas = document.getElementById('analytics-standing-donut');
+    if (!canvas || !standingDist) return;
+
+    const labels = Object.keys(standingDist);
+    const data   = Object.values(standingDist);
+    const COLORS = {
+        "Dean's List": '#a78bfa', 'Good Standing': '#10b981',
+        'Satisfactory': '#06b6d4', 'Academic Warning': '#f59e0b', 'Academic Probation': '#f43f5e',
+    };
+    const bg = labels.map(l => (COLORS[l] || '#6366f1') + 'cc');
+    const border = labels.map(l => COLORS[l] || '#6366f1');
+
+    destroyChart('aStanding');
+    charts.aStanding = new Chart(canvas, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: bg, borderColor: border, borderWidth: 2, hoverOffset: 8 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
+                tooltip: { callbacks: {
+                    label: ctx => ` ${ctx.label}: ${ctx.parsed} student${ctx.parsed !== 1 ? 's' : ''}`,
+                }},
+            },
+        },
+    });
+}
+
+function renderAnalyticsPassFailDonut(passing, failing) {
+    const canvas = document.getElementById('analytics-passfail-donut');
+    if (!canvas) return;
+
+    destroyChart('aPassFail');
+    charts.aPassFail = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: ['Passing', 'Failing'],
+            datasets: [{
+                data:            [passing || 0, failing || 0],
+                backgroundColor: ['#10b981bb', '#f43f5ebb'],
+                borderColor:     ['#10b981', '#f43f5e'],
+                borderWidth:     2,
+                hoverOffset:     8,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
+                tooltip: { callbacks: {
+                    label: ctx => ` ${ctx.label}: ${ctx.parsed} student${ctx.parsed !== 1 ? 's' : ''}`,
+                }},
+            },
+        },
+    });
+}
+
+function renderAnalyticsMajorBar(majorDist) {
+    const canvas = document.getElementById('analytics-major-bar');
+    if (!canvas || !majorDist) return;
+
+    const sorted  = Object.entries(majorDist).sort((a, b) => b[1] - a[1]);
+    const labels  = sorted.map(e => e[0]);
+    const data    = sorted.map(e => e[1]);
+    const palette = ['#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#f43f5e', '#a78bfa', '#34d399'];
+
+    destroyChart('aMajor');
+    charts.aMajor = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Students',
+                data,
+                backgroundColor: labels.map((_, i) => palette[i % palette.length] + 'bb'),
+                borderColor:     labels.map((_, i) => palette[i % palette.length]),
+                borderWidth:     2,
+                borderRadius:    8,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: {
+                label: ctx => ` ${ctx.parsed.y} student${ctx.parsed.y !== 1 ? 's' : ''}`,
+            }}},
+            scales: {
+                y: { ticks: { precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                x: { grid: { display: false }, ticks: { maxRotation: 35, minRotation: 0 } },
+            },
+        },
+    });
 }
 
 /* ==========================================================================
@@ -191,7 +514,7 @@ async function loadStats() {
 async function loadInsights() {
     try {
         const res = await fetch(API.insights);
-        if (!res.ok) { console.warn(`Insights error: ${res.status}`); return; }
+        if (!res.ok) return;
         const insights = await res.json();
 
         const panel     = document.getElementById('support-panel');
@@ -202,15 +525,9 @@ async function loadInsights() {
 
         const flagged = insights.filter(i => i.status === 'needs_attention');
 
-        // Update threshold display from first record (all share the same value).
-        if (insights.length > 0 && threshold) {
-            threshold.textContent = insights[0].threshold;
-        }
+        if (insights.length > 0 && threshold) threshold.textContent = insights[0].threshold;
 
-        if (flagged.length === 0) {
-            panel.style.display = 'none';
-            return;
-        }
+        if (flagged.length === 0) { panel.style.display = 'none'; return; }
 
         panel.style.display = '';
         if (badge) badge.textContent = `${flagged.length} student${flagged.length !== 1 ? 's' : ''} flagged`;
@@ -218,106 +535,14 @@ async function loadInsights() {
         list.innerHTML = '';
         flagged.forEach(item => {
             const row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.75rem;background:var(--surface);border-radius:6px;border-left:3px solid var(--warning);';
-            const nameSpan = document.createElement('span');
-            nameSpan.style.cssText = 'font-weight:600;min-width:140px;';
-            nameSpan.textContent = item.name;
-            const gradeSpan = document.createElement('span');
-            gradeSpan.style.cssText = 'font-weight:700;color:var(--danger);min-width:48px;';
-            gradeSpan.textContent = item.grade;
-            const reasonSpan = document.createElement('span');
-            reasonSpan.style.cssText = 'color:var(--text-muted);font-size:0.85rem;';
-            reasonSpan.textContent = item.reason;
-            row.appendChild(nameSpan);
-            row.appendChild(gradeSpan);
-            row.appendChild(reasonSpan);
+            row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.75rem;background:var(--surface, rgba(255,255,255,0.03));border-radius:6px;border-left:3px solid var(--warning);';
+            row.innerHTML = `
+                <span style="font-weight:600;min-width:140px;">${escapeHtml(item.name)}</span>
+                <span style="font-weight:700;color:var(--danger);min-width:48px;">${item.grade}</span>
+                <span style="color:var(--text-muted);font-size:0.85rem;">${escapeHtml(item.reason)}</span>`;
             list.appendChild(row);
         });
-    } catch (err) {
-        // Non-fatal: silently skip the support panel.
-    }
-}
-
-/* ==========================================================================
-   GRADE DISTRIBUTION CHART (vanilla SVG, no external deps)
-   ========================================================================== */
-function renderGradeDistChart(distribution) {
-    const section = document.getElementById('grade-dist-section');
-    const svg     = document.getElementById('grade-dist-chart');
-    if (!section || !svg) return;
-
-    // Band order matches StatisticsService._BANDS
-    const bands  = ['A (90-100)', 'B (80-89)', 'C (70-79)', 'D (60-69)', 'F (<60)'];
-    const colors = ['#22c55e', '#3b82f6', '#a78bfa', '#f59e0b', '#ef4444'];
-    const counts = bands.map(b => (distribution && distribution[b] != null) ? distribution[b] : 0);
-    const total  = counts.reduce((a, b) => a + b, 0);
-
-    if (total === 0) { section.style.display = 'none'; return; }
-    section.style.display = '';
-
-    const maxCount = Math.max(...counts, 1);
-    const svgW = 560;  // logical width; SVG scales via viewBox
-    const svgH = 140;
-    const barH = 28;
-    const barGap = 8;
-    const labelW = 90;
-    const countW = 40;
-    const barMaxW = svgW - labelW - countW - 16;
-
-    svg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
-    svg.innerHTML = '';
-
-    bands.forEach((band, i) => {
-        const y = i * (barH + barGap);
-        const barW = Math.round((counts[i] / maxCount) * barMaxW);
-
-        // Label
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', labelW - 6);
-        text.setAttribute('y', y + barH / 2 + 5);
-        text.setAttribute('text-anchor', 'end');
-        text.setAttribute('font-size', '11');
-        text.setAttribute('fill', '#57606a');
-        text.textContent = band;
-        svg.appendChild(text);
-
-        // Bar background
-        const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        bgRect.setAttribute('x', labelW);
-        bgRect.setAttribute('y', y);
-        bgRect.setAttribute('width', barMaxW);
-        bgRect.setAttribute('height', barH);
-        bgRect.setAttribute('rx', 4);
-        bgRect.setAttribute('fill', '#f0f2f5');
-        svg.appendChild(bgRect);
-
-        // Bar fill
-        if (barW > 0) {
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x', labelW);
-            rect.setAttribute('y', y);
-            rect.setAttribute('width', barW);
-            rect.setAttribute('height', barH);
-            rect.setAttribute('rx', 4);
-            rect.setAttribute('fill', colors[i]);
-            svg.appendChild(rect);
-        }
-
-        // Count label
-        const countText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        countText.setAttribute('x', labelW + barMaxW + 8);
-        countText.setAttribute('y', y + barH / 2 + 5);
-        countText.setAttribute('font-size', '11');
-        countText.setAttribute('fill', '#57606a');
-        countText.textContent = counts[i];
-        svg.appendChild(countText);
-    });
-}
-
-function setTextIfExists(id, value) {
-    const el = document.getElementById(id);
-    if (!el) { console.warn(`Missing element: ${id}`); return; }
-    el.textContent = (value == null) ? '—' : value;
+    } catch (_) { /* non-fatal */ }
 }
 
 /* ==========================================================================
@@ -327,7 +552,7 @@ function addCourseEntry(container, courseName = '', courseGrade = '') {
     const row = document.createElement('div');
     row.className = 'course-entry';
     row.innerHTML = `
-        <input type="text" class="course-name-input" placeholder="Course name" value="${escapeHtml(courseName)}">
+        <input type="text"   class="course-name-input"  placeholder="Course name" value="${escapeHtml(courseName)}">
         <input type="number" class="course-grade-input" placeholder="Grade" min="0" max="100" value="${courseGrade !== '' && courseGrade != null ? courseGrade : ''}">
         <button type="button" class="btn-remove-course" title="Remove"><i class="fa-solid fa-xmark"></i></button>`;
     row.querySelector('.btn-remove-course').addEventListener('click', () => row.remove());
@@ -335,23 +560,30 @@ function addCourseEntry(container, courseName = '', courseGrade = '') {
 }
 
 function collectCourses(container) {
-    const entries = container.querySelectorAll('.course-entry');
     const courses = [];
-    for (const entry of entries) {
+    for (const entry of container.querySelectorAll('.course-entry')) {
         const name  = entry.querySelector('.course-name-input').value.trim();
         const grade = entry.querySelector('.course-grade-input').value.trim();
         if (!name) continue;
-        courses.push({
-            course: name,
-            grade:  grade !== '' ? parseFloat(grade) : null,
-        });
+        courses.push({ course: name, grade: grade !== '' ? parseFloat(grade) : null });
     }
     return courses;
 }
 
 /* ==========================================================================
-   ADD STUDENT
+   ADD STUDENT DRAWER
    ========================================================================== */
+function openAddDrawer() {
+    document.getElementById('add-drawer')?.classList.remove('hidden');
+    document.getElementById('add-drawer-overlay')?.classList.remove('hidden');
+    setTimeout(() => document.getElementById('student-name')?.focus(), 60);
+}
+
+function closeAddDrawer() {
+    document.getElementById('add-drawer')?.classList.add('hidden');
+    document.getElementById('add-drawer-overlay')?.classList.add('hidden');
+}
+
 async function submitAddStudent(e) {
     e.preventDefault();
 
@@ -364,7 +596,7 @@ async function submitAddStudent(e) {
     const notesInput = document.getElementById('student-notes');
     const coursesCtn = document.getElementById('add-courses-list');
 
-    if (!nameInput || !gradeInput) { console.warn('Missing add-student form inputs'); return; }
+    if (!nameInput || !gradeInput) return;
 
     const name  = nameInput.value.trim();
     const grade = gradeInput.value;
@@ -400,7 +632,7 @@ async function submitAddStudent(e) {
 
     try {
         const res = await fetch(API.students, {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify(payload),
         });
@@ -408,32 +640,52 @@ async function submitAddStudent(e) {
         const data = await res.json();
         if (data.success) {
             showToast(`✅ ${data.student.name} added successfully.`, 'success');
-            // Clear form
-            nameInput.value = '';
+            nameInput.value  = '';
             gradeInput.value = '';
-            if (emailInput) emailInput.value = '';
-            if (majorInput) majorInput.value = '';
-            if (yearInput)  yearInput.value  = '';
-            if (gpaInput)   gpaInput.value   = '';
-            if (notesInput) notesInput.value = '';
-            if (coursesCtn) coursesCtn.innerHTML = '';
-            nameInput.focus();
+            if (emailInput)  emailInput.value  = '';
+            if (majorInput)  majorInput.value  = '';
+            if (yearInput)   yearInput.value   = '';
+            if (gpaInput)    gpaInput.value    = '';
+            if (notesInput)  notesInput.value  = '';
+            if (coursesCtn)  coursesCtn.innerHTML = '';
+            closeAddDrawer();
             loadStudents();
         } else {
             showToast(data.error || 'Failed to add student.', 'error');
         }
-    } catch (err) {
+    } catch (_) {
         showToast('Network error. Could not add student.', 'error');
     }
 }
 
 /* ==========================================================================
-   DELETE STUDENT
+   DELETE STUDENT — modal-based confirmation
    ========================================================================== */
-async function deleteStudent(studentId, name) {
-    if (!confirm(`Are you sure you want to remove "${name}"?`)) return;
+let _pendingDeleteId   = null;
+let _pendingDeleteName = null;
+
+function openDeleteModal(studentId, name) {
+    _pendingDeleteId   = studentId;
+    _pendingDeleteName = name;
+    const modal = document.getElementById('delete-modal');
+    const label = document.getElementById('delete-confirm-name');
+    if (label) label.textContent = name;
+    modal?.classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    _pendingDeleteId   = null;
+    _pendingDeleteName = null;
+    document.getElementById('delete-modal')?.classList.add('hidden');
+}
+
+async function confirmDelete() {
+    if (!_pendingDeleteId) return;
+    const id   = _pendingDeleteId;
+    const name = _pendingDeleteName;
+    closeDeleteModal();
     try {
-        const res = await fetch(`${API.students}/${studentId}`, { method: 'DELETE' });
+        const res = await fetch(`${API.students}/${id}`, { method: 'DELETE' });
         if (!res.ok) { showToast(`Server error (${res.status}).`, 'error'); return; }
         const data = await res.json();
         if (data.success) {
@@ -442,25 +694,22 @@ async function deleteStudent(studentId, name) {
         } else {
             showToast(data.error || 'Failed to delete student.', 'error');
         }
-    } catch (err) {
+    } catch (_) {
         showToast('Network error. Could not delete student.', 'error');
     }
 }
 
 /* ==========================================================================
-   EDIT STUDENT MODAL  (full-field update)
+   EDIT STUDENT MODAL
    ========================================================================== */
 function openEditModal(s) {
     const editModal   = document.getElementById('edit-modal');
     const editIdInput = document.getElementById('edit-student-id');
     const modalName   = document.getElementById('modal-student-name');
     const modalId     = document.getElementById('modal-student-id');
+    if (!editModal || !editIdInput || !modalName || !modalId) return;
 
-    if (!editModal || !editIdInput || !modalName || !modalId) {
-        console.warn('Missing edit-modal elements'); return;
-    }
-
-    editIdInput.value = s.student_id;
+    editIdInput.value     = s.student_id;
     modalName.textContent = s.name;
     modalId.textContent   = s.id;
 
@@ -476,7 +725,6 @@ function openEditModal(s) {
     setVal('edit-student-year',  s.academic_year);
     setVal('edit-student-notes', s.notes);
 
-    // Populate courses
     const coursesCtn = document.getElementById('edit-courses-list');
     if (coursesCtn) {
         coursesCtn.innerHTML = '';
@@ -489,22 +737,21 @@ function openEditModal(s) {
 }
 
 function closeEditModal() {
-    const editModal = document.getElementById('edit-modal');
-    if (editModal) editModal.classList.add('hidden');
+    document.getElementById('edit-modal')?.classList.add('hidden');
 }
 
 async function submitEditStudent(e) {
     e.preventDefault();
-    const studentId   = document.getElementById('edit-student-id')?.value;
-    const gradeInput  = document.getElementById('edit-student-grade');
-    const gpaInput    = document.getElementById('edit-student-gpa');
-    const emailInput  = document.getElementById('edit-student-email');
-    const majorInput  = document.getElementById('edit-student-major');
-    const yearInput   = document.getElementById('edit-student-year');
-    const notesInput  = document.getElementById('edit-student-notes');
-    const coursesCtn  = document.getElementById('edit-courses-list');
+    const studentId  = document.getElementById('edit-student-id')?.value;
+    const gradeInput = document.getElementById('edit-student-grade');
+    const gpaInput   = document.getElementById('edit-student-gpa');
+    const emailInput = document.getElementById('edit-student-email');
+    const majorInput = document.getElementById('edit-student-major');
+    const yearInput  = document.getElementById('edit-student-year');
+    const notesInput = document.getElementById('edit-student-notes');
+    const coursesCtn = document.getElementById('edit-courses-list');
 
-    if (!studentId || !gradeInput) { console.warn('Missing edit form elements'); return; }
+    if (!studentId || !gradeInput) return;
 
     const newGrade = gradeInput.value;
     if (newGrade === '' || isNaN(newGrade) || Number(newGrade) < minGrade || Number(newGrade) > maxGrade) {
@@ -546,7 +793,7 @@ async function submitEditStudent(e) {
         } else {
             showToast(data.error || 'Failed to update student.', 'error');
         }
-    } catch (err) {
+    } catch (_) {
         showToast('Network error. Could not update student.', 'error');
     }
 }
@@ -557,14 +804,13 @@ async function submitEditStudent(e) {
 function openDetailModal(s) {
     const modal = document.getElementById('detail-modal');
     const body  = document.getElementById('detail-modal-body');
-    if (!modal || !body) { console.warn('Missing detail-modal elements'); return; }
+    if (!modal || !body) return;
 
-    const gpaDisplay = s.gpa != null ? `<span style="color:${getGpaColor(s.gpa)};font-weight:700;">${s.gpa.toFixed(2)}</span>` : '—';
-    const gradeColor = getGradeColor(s.grade);
-    const status     = getGradeStatus(s.grade);
+    const gpaDisplay    = s.gpa != null ? `<span style="color:${getGpaColor(s.gpa)};font-weight:700;">${s.gpa.toFixed(2)}</span>` : '—';
+    const gradeColor    = getGradeColor(s.grade);
+    const status        = getGradeStatus(s.grade);
     const standingBadge = getStandingBadgeClass(s.standing);
 
-    // Build course pills HTML
     let coursesHtml = '<em style="color:var(--text-dim);font-size:0.85rem;">No courses enrolled.</em>';
     if (s.courses && s.courses.length > 0) {
         const pills = s.courses.map(c => {
@@ -576,40 +822,19 @@ function openDetailModal(s) {
 
     body.innerHTML = `
         <div class="profile-grid">
-            <div class="profile-field">
-                <label>Full Name</label>
-                <span>${escapeHtml(s.name)}</span>
-            </div>
-            <div class="profile-field">
-                <label>Student ID</label>
-                <span style="font-family:monospace;color:var(--text-muted);">${escapeHtml(s.id)}</span>
-            </div>
-            <div class="profile-field">
-                <label>Email</label>
-                <span>${s.email ? escapeHtml(s.email) : '<span style="color:var(--text-dim)">—</span>'}</span>
-            </div>
-            <div class="profile-field">
-                <label>Major / Program</label>
-                <span>${s.major ? escapeHtml(s.major) : '<span style="color:var(--text-dim)">—</span>'}</span>
-            </div>
-            <div class="profile-field">
-                <label>Academic Year</label>
-                <span>${s.academic_year ? escapeHtml(s.academic_year) : '<span style="color:var(--text-dim)">—</span>'}</span>
-            </div>
+            <div class="profile-field"><label>Full Name</label><span>${escapeHtml(s.name)}</span></div>
+            <div class="profile-field"><label>Student ID</label><span style="font-family:monospace;color:var(--text-muted);">${escapeHtml(s.id)}</span></div>
+            <div class="profile-field"><label>Email</label><span>${s.email ? escapeHtml(s.email) : '<span style="color:var(--text-dim)">—</span>'}</span></div>
+            <div class="profile-field"><label>Major / Program</label><span>${s.major ? escapeHtml(s.major) : '<span style="color:var(--text-dim)">—</span>'}</span></div>
+            <div class="profile-field"><label>Academic Year</label><span>${s.academic_year ? escapeHtml(s.academic_year) : '<span style="color:var(--text-dim)">—</span>'}</span></div>
             <div class="profile-field">
                 <label>Overall Grade</label>
-                <span style="color:${gradeColor};font-family:'Outfit',sans-serif;font-size:1.2rem;font-weight:700;">${s.grade}
-                    &nbsp;<span class="badge ${status.badge}" style="font-size:0.75rem;">${status.label}</span>
+                <span style="color:${gradeColor};font-family:'Outfit',sans-serif;font-size:1.2rem;font-weight:700;">
+                    ${s.grade}&nbsp;<span class="badge ${status.badge}" style="font-size:0.7rem;">${status.label}</span>
                 </span>
             </div>
-            <div class="profile-field">
-                <label>GPA</label>
-                <span>${gpaDisplay}</span>
-            </div>
-            <div class="profile-field">
-                <label>Academic Standing</label>
-                <span class="badge ${standingBadge}">${s.standing || '—'}</span>
-            </div>
+            <div class="profile-field"><label>GPA</label><span>${gpaDisplay}</span></div>
+            <div class="profile-field"><label>Academic Standing</label><span class="badge ${standingBadge}">${s.standing || '—'}</span></div>
         </div>
         <div class="profile-courses">
             <p class="profile-courses-title">Enrolled Courses &amp; Grades</p>
@@ -635,37 +860,33 @@ function openDetailModal(s) {
 }
 
 function closeDetailModal() {
-    const modal = document.getElementById('detail-modal');
-    if (modal) modal.classList.add('hidden');
+    document.getElementById('detail-modal')?.classList.add('hidden');
 }
 
 /* ==========================================================================
-   SEARCH (live name search with debounce)
+   SEARCH (live debounced)
    ========================================================================== */
 let searchDebounce = null;
 
 async function performSearch(query) {
     try {
         const res = await fetch(`${API.search}?name=${encodeURIComponent(query)}`);
-        if (!res.ok) { console.warn(`Search error: ${res.status}`); return; }
+        if (!res.ok) return;
         const data = await res.json();
 
         const container = document.getElementById('search-result-container');
-        if (!container) { console.warn('Missing: search-result-container'); return; }
+        if (!container) return;
 
         if (data.found && data.students && data.students.length > 0) {
             const first = data.students[0];
-            const resultName  = document.getElementById('result-name');
-            const resultId    = document.getElementById('result-id');
-            const resultGrade = document.getElementById('result-grade');
-
-            if (resultName)  resultName.textContent  = first.name;
-            if (resultId)    resultId.textContent     = first.id;
-            if (resultGrade) resultGrade.textContent  =
-                data.students.length === 1
-                    ? `Grade: ${first.grade}`
-                    : `${data.students.length} matches`;
-
+            const rn = document.getElementById('result-name');
+            const ri = document.getElementById('result-id');
+            const rg = document.getElementById('result-grade');
+            if (rn) rn.textContent = first.name;
+            if (ri) ri.textContent = first.id;
+            if (rg) rg.textContent = data.students.length === 1
+                ? `Grade: ${first.grade}`
+                : `${data.students.length} matches`;
             container.classList.remove('hidden');
             clearHighlight();
             data.students.forEach(s => highlightRow(s.index));
@@ -673,17 +894,12 @@ async function performSearch(query) {
             container.classList.add('hidden');
             clearHighlight();
         }
-    } catch (err) {
-        // silently fail
-    }
+    } catch (_) { /* silently fail */ }
 }
 
 function highlightRow(index) {
     const row = document.querySelector(`tr[data-index="${index}"]`);
-    if (row) {
-        row.classList.add('row-highlight');
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    if (row) { row.classList.add('row-highlight'); row.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 
 function clearHighlight() {
@@ -691,7 +907,7 @@ function clearHighlight() {
 }
 
 /* ==========================================================================
-   FILTER (multi-criteria)
+   FILTER
    ========================================================================== */
 async function applyFilter() {
     const name     = (document.getElementById('search-input')?.value     || '').trim();
@@ -701,34 +917,31 @@ async function applyFilter() {
     const minGradeF= (document.getElementById('filter-min-grade')?.value  || '').trim();
 
     const params = new URLSearchParams();
-    if (name)     params.set('name',     name);
-    if (major)    params.set('major',    major);
-    if (year)     params.set('academic_year', year);
-    if (standing) params.set('standing', standing);
-    if (minGradeF !== '') params.set('min_grade', minGradeF);
+    if (name)      params.set('name',          name);
+    if (major)     params.set('major',         major);
+    if (year)      params.set('academic_year', year);
+    if (standing)  params.set('standing',      standing);
+    if (minGradeF) params.set('min_grade',     minGradeF);
 
     try {
         const res = await fetch(`${API.filter}?${params.toString()}`);
         if (!res.ok) { showToast(`Filter error (${res.status}).`, 'error'); return; }
         const students = await res.json();
         renderStudentTable(students);
-        const activeCount = [...params.values()].filter(v => v !== '').length;
-        if (activeCount > 0) {
+        if ([...params.values()].filter(Boolean).length > 0) {
             showToast(`Filter applied — ${students.length} match(es).`, 'info');
         }
-    } catch (err) {
+    } catch (_) {
         showToast('Network error during filter.', 'error');
     }
 }
 
 function clearFilter() {
-    const ids = ['search-input', 'filter-major', 'filter-year', 'filter-standing', 'filter-min-grade'];
-    ids.forEach(id => {
+    ['search-input', 'filter-major', 'filter-year', 'filter-standing', 'filter-min-grade'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    const container = document.getElementById('search-result-container');
-    if (container) container.classList.add('hidden');
+    document.getElementById('search-result-container')?.classList.add('hidden');
     clearHighlight();
     loadStudents();
     showToast('Filter cleared.', 'info');
@@ -745,61 +958,87 @@ async function sortStudents(ascending) {
         renderStudentTable(students);
         loadStats();
         showToast(`Sorted ${ascending ? 'Low → High' : 'High → Low'}.`, 'info');
-    } catch (err) {
+    } catch (_) {
         showToast('Failed to sort.', 'error');
     }
 }
 
 /* ==========================================================================
-   INITIAL LOAD — wire up all DOM-dependent code after DOM is ready
+   SAVE DATABASE
+   ========================================================================== */
+async function saveDatabase() {
+    try {
+        const res  = await fetch(API.save, { method: 'POST' });
+        if (!res.ok) { showToast(`Save error (${res.status}).`, 'error'); return; }
+        const data = await res.json();
+        showToast(data.success ? '💾 Database saved.' : 'Save failed.', data.success ? 'success' : 'error');
+    } catch (_) {
+        showToast('Network error. Could not save.', 'error');
+    }
+}
+
+/* ==========================================================================
+   CONFIG LOAD
+   ========================================================================== */
+async function loadConfig() {
+    try {
+        const res = await fetch(API.config);
+        if (!res.ok) return;
+        const cfg = await res.json();
+        if (typeof cfg.min_grade        === 'number') minGrade         = cfg.min_grade;
+        if (typeof cfg.max_grade        === 'number') maxGrade         = cfg.max_grade;
+        if (typeof cfg.passing_threshold === 'number') passingThreshold = cfg.passing_threshold;
+    } catch (_) { /* retain defaults */ }
+}
+
+/* ==========================================================================
+   DOM READY — wire everything up
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof Chart !== 'undefined') applyChartDefaults();
 
-    // ── Add Student Form ──────────────────────────────────────────────────
+    initNav();
+
+    // ── Add Student drawer ────────────────────────────────────────────────
+    document.getElementById('btn-open-add-drawer')?.addEventListener('click', openAddDrawer);
+    document.getElementById('btn-close-add-drawer')?.addEventListener('click', closeAddDrawer);
+    document.getElementById('add-drawer-overlay')?.addEventListener('click', closeAddDrawer);
+
     const addForm = document.getElementById('add-student-form');
     if (addForm) addForm.addEventListener('submit', submitAddStudent);
 
-    const btnAddCourse = document.getElementById('btn-add-course');
-    if (btnAddCourse) {
-        btnAddCourse.addEventListener('click', () => {
-            const container = document.getElementById('add-courses-list');
-            if (container) addCourseEntry(container);
-        });
-    }
+    document.getElementById('btn-add-course')?.addEventListener('click', () => {
+        const c = document.getElementById('add-courses-list');
+        if (c) addCourseEntry(c);
+    });
 
-    // ── Edit Modal ────────────────────────────────────────────────────────
-    const editModal     = document.getElementById('edit-modal');
-    const modalClose    = document.getElementById('modal-close');
-    const btnEditCancel = document.getElementById('btn-edit-cancel');
-    const editForm      = document.getElementById('edit-grade-form');
+    // ── Edit modal ────────────────────────────────────────────────────────
+    document.getElementById('modal-close')?.addEventListener('click', closeEditModal);
+    document.getElementById('btn-edit-cancel')?.addEventListener('click', closeEditModal);
+    document.getElementById('edit-modal')?.addEventListener('click', e => { if (e.target.id === 'edit-modal') closeEditModal(); });
+    document.getElementById('edit-grade-form')?.addEventListener('submit', submitEditStudent);
+    document.getElementById('btn-edit-add-course')?.addEventListener('click', () => {
+        const c = document.getElementById('edit-courses-list');
+        if (c) addCourseEntry(c);
+    });
 
-    if (modalClose)    modalClose.addEventListener('click', closeEditModal);
-    if (btnEditCancel) btnEditCancel.addEventListener('click', closeEditModal);
-    if (editModal)     editModal.addEventListener('click', e => { if (e.target === editModal) closeEditModal(); });
-    if (editForm)      editForm.addEventListener('submit', submitEditStudent);
+    // ── Detail modal ──────────────────────────────────────────────────────
+    document.getElementById('detail-modal-close')?.addEventListener('click', closeDetailModal);
+    document.getElementById('detail-modal')?.addEventListener('click', e => { if (e.target.id === 'detail-modal') closeDetailModal(); });
 
-    const btnEditAddCourse = document.getElementById('btn-edit-add-course');
-    if (btnEditAddCourse) {
-        btnEditAddCourse.addEventListener('click', () => {
-            const container = document.getElementById('edit-courses-list');
-            if (container) addCourseEntry(container);
-        });
-    }
+    // ── Delete confirm modal ──────────────────────────────────────────────
+    document.getElementById('delete-modal-close')?.addEventListener('click', closeDeleteModal);
+    document.getElementById('delete-cancel-btn')?.addEventListener('click', closeDeleteModal);
+    document.getElementById('delete-confirm-btn')?.addEventListener('click', confirmDelete);
+    document.getElementById('delete-modal')?.addEventListener('click', e => { if (e.target.id === 'delete-modal') closeDeleteModal(); });
 
-    // ── Detail Modal ──────────────────────────────────────────────────────
-    const detailModal      = document.getElementById('detail-modal');
-    const detailModalClose = document.getElementById('detail-modal-close');
-    if (detailModalClose) detailModalClose.addEventListener('click', closeDetailModal);
-    if (detailModal)      detailModal.addEventListener('click', e => { if (e.target === detailModal) closeDetailModal(); });
-
-    // ── Escape key closes any open modal ─────────────────────────────────
+    // ── Escape key ────────────────────────────────────────────────────────
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') {
-            const em = document.getElementById('edit-modal');
-            const dm = document.getElementById('detail-modal');
-            if (em && !em.classList.contains('hidden')) closeEditModal();
-            if (dm && !dm.classList.contains('hidden')) closeDetailModal();
-        }
+        if (e.key !== 'Escape') return;
+        if (!document.getElementById('edit-modal')?.classList.contains('hidden'))   closeEditModal();
+        if (!document.getElementById('detail-modal')?.classList.contains('hidden')) closeDetailModal();
+        if (!document.getElementById('delete-modal')?.classList.contains('hidden')) closeDeleteModal();
+        if (!document.getElementById('add-drawer')?.classList.contains('hidden'))   closeAddDrawer();
     });
 
     // ── Search (live debounced) ───────────────────────────────────────────
@@ -808,9 +1047,8 @@ document.addEventListener('DOMContentLoaded', () => {
         searchInput.addEventListener('input', () => {
             clearTimeout(searchDebounce);
             const query = searchInput.value.trim();
-            const container = document.getElementById('search-result-container');
             if (!query) {
-                if (container) container.classList.add('hidden');
+                document.getElementById('search-result-container')?.classList.add('hidden');
                 clearHighlight();
                 return;
             }
@@ -818,72 +1056,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const btnSearchLocate = document.getElementById('btn-search-locate');
-    if (btnSearchLocate) {
-        btnSearchLocate.addEventListener('click', () => {
-            clearHighlight();
-            const name = document.getElementById('result-name')?.textContent;
-            if (!name) return;
-            document.querySelectorAll('#students-table-body tr').forEach(row => {
-                const nc = row.querySelector('.name-cell');
-                if (nc && nc.childNodes[0] && nc.childNodes[0].textContent.trim() === name) {
-                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    row.classList.add('row-highlight');
-                }
-            });
-        });
-    }
-
-    const btnSearchClear = document.getElementById('btn-search-clear');
-    if (btnSearchClear) {
-        btnSearchClear.addEventListener('click', () => {
-            if (searchInput) searchInput.value = '';
-            const container = document.getElementById('search-result-container');
-            if (container) container.classList.add('hidden');
-            clearHighlight();
-        });
-    }
-
-    // ── Filter buttons ───────────────────────────────────────────────────
-    const btnApplyFilter = document.getElementById('btn-apply-filter');
-    const btnClearFilter = document.getElementById('btn-clear-filter');
-    if (btnApplyFilter) btnApplyFilter.addEventListener('click', applyFilter);
-    if (btnClearFilter) btnClearFilter.addEventListener('click', clearFilter);
-
-    // ── Sort buttons ─────────────────────────────────────────────────────
-    const btnSortAsc  = document.getElementById('btn-sort-asc');
-    const btnSortDesc = document.getElementById('btn-sort-desc');
-    if (btnSortAsc)  btnSortAsc.addEventListener('click',  () => sortStudents(true));
-    if (btnSortDesc) btnSortDesc.addEventListener('click', () => sortStudents(false));
-
-    // ── Save Database ────────────────────────────────────────────────────
-    const btnSaveDb = document.getElementById('btn-save-db');
-    if (btnSaveDb) {
-        btnSaveDb.addEventListener('click', async () => {
-            try {
-                const res  = await fetch(API.save, { method: 'POST' });
-                if (!res.ok) { showToast(`Save error (${res.status}).`, 'error'); return; }
-                const data = await res.json();
-                showToast(data.success ? '💾 Database saved.' : 'Save failed.', data.success ? 'success' : 'error');
-            } catch (err) {
-                showToast('Network error. Could not save.', 'error');
+    document.getElementById('btn-search-locate')?.addEventListener('click', () => {
+        clearHighlight();
+        const name = document.getElementById('result-name')?.textContent;
+        if (!name) return;
+        document.querySelectorAll('#students-table-body tr').forEach(row => {
+            const nc = row.querySelector('.name-cell');
+            if (nc && nc.childNodes[0] && nc.childNodes[0].textContent.trim() === name) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.classList.add('row-highlight');
             }
         });
-    }
+    });
 
-    // ── Initial Data Load ────────────────────────────────────────────────
+    document.getElementById('btn-search-clear')?.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        document.getElementById('search-result-container')?.classList.add('hidden');
+        clearHighlight();
+    });
+
+    // ── Filter / sort ─────────────────────────────────────────────────────
+    document.getElementById('btn-apply-filter')?.addEventListener('click', applyFilter);
+    document.getElementById('btn-clear-filter')?.addEventListener('click', clearFilter);
+    document.getElementById('btn-sort-asc')?.addEventListener('click',  () => sortStudents(true));
+    document.getElementById('btn-sort-desc')?.addEventListener('click', () => sortStudents(false));
+
+    // ── Save ──────────────────────────────────────────────────────────────
+    document.getElementById('btn-save-db')?.addEventListener('click', saveDatabase);
+    document.getElementById('btn-save-db-mobile')?.addEventListener('click', saveDatabase);
+
+    // ── Analytics refresh ─────────────────────────────────────────────────
+    document.getElementById('btn-refresh-analytics')?.addEventListener('click', () => {
+        window._lastStats = null;
+        renderAnalyticsCharts();
+    });
+
+    // ── Initial load ──────────────────────────────────────────────────────
     loadConfig().then(() => loadStudents());
 });
-
-async function loadConfig() {
-    try {
-        const res = await fetch(API.config);
-        if (!res.ok) return;
-        const cfg = await res.json();
-        if (typeof cfg.min_grade === 'number') minGrade = cfg.min_grade;
-        if (typeof cfg.max_grade === 'number') maxGrade = cfg.max_grade;
-        if (typeof cfg.passing_threshold === 'number') passingThreshold = cfg.passing_threshold;
-    } catch (_) {
-        // Non-fatal: retain defaults (0 / 100 / 60).
-    }
-}

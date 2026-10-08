@@ -4,337 +4,409 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Grade Management Dashboard</title>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Main Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="app-container">
 
-        <!-- ── Header ─────────────────────────────────────────────────── -->
-        <header class="app-header">
-            <div class="header-logo">
-                <i class="fa-solid fa-graduation-cap header-icon"></i>
-                <div class="header-title-wrapper">
-                    <h1>Student Grade System</h1>
-                    <p class="header-subtitle">Academic Performance Control Centre</p>
-                </div>
+    <!-- ── Sidebar ───────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="fa-solid fa-graduation-cap sidebar-logo-icon"></i>
+            <div>
+                <span class="sidebar-title">GradeSystem</span>
+                <span class="sidebar-sub">Academic Control Centre</span>
             </div>
-            <div class="header-actions">
-                <span id="connection-status" class="status-pill status-connected">
-                    <span class="status-indicator-dot"></span>
-                    Connected
-                </span>
+        </div>
+        <nav class="sidebar-nav">
+            <button class="nav-item active" data-tab="dashboard">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-item" data-tab="students">
+                <i class="fa-solid fa-users"></i>
+                <span>Students</span>
+            </button>
+            <button class="nav-item" data-tab="analytics">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>Analytics</span>
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <span id="connection-status" class="status-pill status-connected">
+                <span class="status-indicator-dot"></span>
+                <span class="status-label-text">Connected</span>
+            </span>
+        </div>
+    </aside>
+
+    <!-- ── Mobile top bar ────────────────────────────────────────────────── -->
+    <header class="mobile-topbar">
+        <button class="btn-hamburger" id="btn-hamburger" aria-label="Toggle menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <span class="mobile-title">GradeSystem</span>
+        <button id="btn-save-db-mobile" class="btn btn-sm btn-secondary">
+            <i class="fa-solid fa-floppy-disk"></i>
+        </button>
+    </header>
+
+    <!-- ── Main Content ───────────────────────────────────────────────────── -->
+    <div class="main-content">
+
+        <!-- ══ TAB: DASHBOARD ══════════════════════════════════════════════ -->
+        <div class="tab-page active" id="tab-dashboard">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Overview</h1>
+                    <p class="page-sub">Live snapshot of your class performance</p>
+                </div>
                 <button id="btn-save-db" class="btn btn-secondary">
                     <i class="fa-solid fa-floppy-disk"></i> Save Database
                 </button>
             </div>
-        </header>
 
-        <!-- ── Stats Grid ──────────────────────────────────────────────── -->
-        <section class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon icon-blue"><i class="fa-solid fa-users"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Total Students</span>
-                    <h3 id="stat-total" class="stat-value">0</h3>
+            <!-- Stat cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon icon-blue"><i class="fa-solid fa-users"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Total Students</span>
+                        <h3 id="stat-total" class="stat-value">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-purple"><i class="fa-solid fa-chart-line"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Class Average</span>
+                        <h3 id="stat-average" class="stat-value">0.0</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-amber"><i class="fa-solid fa-star-half-stroke"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Avg GPA</span>
+                        <h3 id="stat-avg-gpa" class="stat-value">—</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-green"><i class="fa-solid fa-award"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Highest Grade</span>
+                        <h3 id="stat-highest" class="stat-value">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-teal"><i class="fa-solid fa-circle-check"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label">Passing Rate</span>
+                        <h3 id="stat-pass-rate" class="stat-value">0%</h3>
+                    </div>
                 </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon icon-purple"><i class="fa-solid fa-chart-line"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Class Average</span>
-                    <h3 id="stat-average" class="stat-value">0.0</h3>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon icon-amber"><i class="fa-solid fa-star-half-stroke"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Avg GPA</span>
-                    <h3 id="stat-avg-gpa" class="stat-value">—</h3>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon icon-green"><i class="fa-solid fa-award"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Highest Grade</span>
-                    <h3 id="stat-highest" class="stat-value">0</h3>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon icon-teal"><i class="fa-solid fa-circle-check"></i></div>
-                <div class="stat-content">
-                    <span class="stat-label">Passing Rate</span>
-                    <h3 id="stat-pass-rate" class="stat-value">0%</h3>
-                </div>
-            </div>
-        </section>
 
-        <!-- ── Grade Distribution Chart ──────────────────────────────── -->
-        <section id="grade-dist-section" class="card glass-card" style="margin:0 0 1.5rem 0;display:none;">
-            <div class="card-header">
-                <h2 style="margin:0;"><i class="fa-solid fa-chart-bar" style="color:var(--info);"></i> Grade Distribution</h2>
-            </div>
-            <div class="card-body" style="padding-top:0.5rem;">
-                <svg id="grade-dist-chart" width="100%" height="160" role="img" aria-label="Grade distribution bar chart"
-                     style="overflow:visible;display:block;"></svg>
-            </div>
-        </section>
-
-        <!-- ── Support Panel ──────────────────────────────────────────── -->
-        <section id="support-panel" class="support-panel card glass-card" style="margin:0 0 1.5rem 0;display:none;">
-            <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                <h2 style="margin:0;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> Support Panel — Students Needing Attention</h2>
-                <span id="support-count-badge" class="result-badge" style="font-size:0.8rem;"></span>
-            </div>
-            <div class="card-body" style="padding-top:0.5rem;">
-                <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 0.75rem 0;">
-                    Students whose current grade is below the passing threshold (<strong id="support-threshold">60</strong>).
-                    Flags update automatically when grades change.
-                </p>
-                <div id="support-list" style="display:flex;flex-direction:column;gap:0.5rem;"></div>
-            </div>
-        </section>
-
-        <!-- ── Main Workspace ──────────────────────────────────────────── -->
-        <main class="dashboard-main">
-
-            <!-- Left Panel: Controls -->
-            <div class="control-panel">
-
-                <!-- Add Student Card -->
-                <div class="card glass-card">
+            <!-- Dashboard bottom row: grade dist + standing donut -->
+            <div class="dashboard-charts-row">
+                <div class="card glass-card chart-card" id="grade-dist-section" style="display:none;">
                     <div class="card-header">
-                        <h2><i class="fa-solid fa-user-plus"></i> Add New Student</h2>
+                        <h2><i class="fa-solid fa-chart-bar" style="color:var(--info);"></i> Grade Distribution</h2>
                     </div>
-                    <div class="card-body">
-                        <form id="add-student-form">
-                            <!-- Row 1 -->
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="student-name">Full Name <span class="req">*</span></label>
-                                    <div class="input-wrapper">
-                                        <i class="fa-regular fa-user input-icon"></i>
-                                        <input type="text" id="student-name" placeholder="e.g. Samin Ahmed" required>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="student-grade">Grade (0–100) <span class="req">*</span></label>
-                                    <div class="input-wrapper">
-                                        <i class="fa-solid fa-percent input-icon"></i>
-                                        <input type="number" id="student-grade" min="0" max="100" step="0.1" placeholder="e.g. 85" required>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Row 2 -->
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="student-email">Email</label>
-                                    <div class="input-wrapper">
-                                        <i class="fa-solid fa-envelope input-icon"></i>
-                                        <input type="email" id="student-email" placeholder="student@uni.edu">
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="student-major">Major / Program</label>
-                                    <div class="input-wrapper">
-                                        <i class="fa-solid fa-book input-icon"></i>
-                                        <input type="text" id="student-major" placeholder="e.g. Computer Science">
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Row 3 -->
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="student-year">Academic Year</label>
-                                    <div class="input-wrapper select-wrapper">
-                                        <i class="fa-solid fa-calendar-days input-icon"></i>
-                                        <select id="student-year">
-                                            <option value="">— Select Year —</option>
-                                            <option value="Freshman">Freshman</option>
-                                            <option value="Sophomore">Sophomore</option>
-                                            <option value="Junior">Junior</option>
-                                            <option value="Senior">Senior</option>
-                                            <option value="Graduate">Graduate</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="student-gpa">GPA (0.0–4.0)</label>
-                                    <div class="input-wrapper">
-                                        <i class="fa-solid fa-medal input-icon"></i>
-                                        <input type="number" id="student-gpa" min="0" max="4" step="0.01" placeholder="e.g. 3.50">
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Courses -->
-                            <div class="form-group">
-                                <label>Enrolled Courses</label>
-                                <div id="add-courses-list" class="courses-list"></div>
-                                <button type="button" id="btn-add-course" class="btn btn-sm btn-ghost mt-sm">
-                                    <i class="fa-solid fa-plus"></i> Add Course
-                                </button>
-                            </div>
-                            <!-- Notes -->
-                            <div class="form-group">
-                                <label for="student-notes">Academic Notes</label>
-                                <textarea id="student-notes" rows="2" placeholder="Optional notes about this student…"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-block">
-                                <i class="fa-solid fa-plus"></i> Add Student
-                            </button>
-                        </form>
+                    <div class="card-body chart-body">
+                        <canvas id="grade-dist-chart"></canvas>
                     </div>
                 </div>
 
-                <!-- Search & Filter Card -->
-                <div class="card glass-card">
+                <div class="card glass-card chart-card" id="standing-donut-section" style="display:none;">
                     <div class="card-header">
-                        <h2><i class="fa-solid fa-filter"></i> Search &amp; Filter</h2>
+                        <h2><i class="fa-solid fa-chart-pie" style="color:var(--primary);"></i> Academic Standing</h2>
                     </div>
-                    <div class="card-body">
-                        <!-- Live name search -->
-                        <div class="form-group">
-                            <label for="search-input">Search by Name</label>
-                            <div class="input-wrapper">
-                                <i class="fa-solid fa-magnifying-glass input-icon"></i>
-                                <input type="text" id="search-input" placeholder="Type to search…">
-                            </div>
-                        </div>
-                        <!-- Filter row -->
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="filter-major">Major</label>
-                                <div class="input-wrapper">
-                                    <i class="fa-solid fa-book input-icon"></i>
-                                    <input type="text" id="filter-major" placeholder="Any major">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="filter-year">Year</label>
-                                <div class="input-wrapper select-wrapper">
-                                    <i class="fa-solid fa-calendar-days input-icon"></i>
-                                    <select id="filter-year">
-                                        <option value="">Any</option>
-                                        <option value="Freshman">Freshman</option>
-                                        <option value="Sophomore">Sophomore</option>
-                                        <option value="Junior">Junior</option>
-                                        <option value="Senior">Senior</option>
-                                        <option value="Graduate">Graduate</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="filter-standing">Standing</label>
-                                <div class="input-wrapper select-wrapper">
-                                    <i class="fa-solid fa-chart-bar input-icon"></i>
-                                    <select id="filter-standing">
-                                        <option value="">Any</option>
-                                        <option value="Dean's List">Dean's List</option>
-                                        <option value="Good Standing">Good Standing</option>
-                                        <option value="Satisfactory">Satisfactory</option>
-                                        <option value="Academic Warning">Academic Warning</option>
-                                        <option value="Academic Probation">Academic Probation</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="filter-min-grade">Min Grade</label>
-                                <div class="input-wrapper">
-                                    <i class="fa-solid fa-arrow-down input-icon"></i>
-                                    <input type="number" id="filter-min-grade" min="0" max="100" placeholder="0">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="filter-actions">
-                            <button id="btn-apply-filter" class="btn btn-primary">
-                                <i class="fa-solid fa-filter"></i> Apply
-                            </button>
-                            <button id="btn-clear-filter" class="btn btn-secondary">
-                                <i class="fa-solid fa-xmark"></i> Clear
-                            </button>
-                        </div>
-
-                        <!-- Search result banner -->
-                        <div id="search-result-container" class="search-result-box hidden">
-                            <div class="search-result-detail">
-                                <span class="result-label">Result Found:</span>
-                                <div class="result-info">
-                                    <strong id="result-name"></strong>
-                                    <span id="result-id" class="result-badge"></span>
-                                    <span id="result-grade" class="result-grade-val"></span>
-                                </div>
-                            </div>
-                            <div class="search-result-actions">
-                                <button id="btn-search-locate" class="btn btn-sm btn-info">
-                                    <i class="fa-solid fa-eye"></i> Focus Row
-                                </button>
-                                <button id="btn-search-clear" class="btn btn-sm btn-clear">
-                                    <i class="fa-solid fa-xmark"></i> Clear
-                                </button>
-                            </div>
-                        </div>
+                    <div class="card-body chart-body donut-body">
+                        <canvas id="standing-donut-chart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Panel: Student Table -->
-            <div class="table-panel">
-                <div class="card glass-card table-card">
-                    <div class="table-card-header">
-                        <div class="header-left">
-                            <h2><i class="fa-solid fa-list-check"></i> Student Directory</h2>
-                            <p id="table-subtitle">Displaying database records</p>
-                        </div>
-                        <div class="header-right">
-                            <div class="sort-actions">
-                                <span class="sort-label">Sort:</span>
-                                <button id="btn-sort-asc" class="btn btn-icon btn-secondary" title="Sort Ascending (Low → High)">
-                                    <i class="fa-solid fa-arrow-up-1-9"></i>
-                                </button>
-                                <button id="btn-sort-desc" class="btn btn-icon btn-secondary" title="Sort Descending (High → Low)">
-                                    <i class="fa-solid fa-arrow-down-9-1"></i>
-                                </button>
-                            </div>
-                        </div>
+            <!-- Support Panel -->
+            <div id="support-panel" class="card glass-card support-panel-card" style="display:none;">
+                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                    <h2><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> Students Needing Attention</h2>
+                    <span id="support-count-badge" class="result-badge" style="font-size:0.8rem;"></span>
+                </div>
+                <div class="card-body" style="padding-top:0.5rem;">
+                    <p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 0.75rem 0;">
+                        Grade below passing threshold (<strong id="support-threshold">60</strong>). Flags update automatically.
+                    </p>
+                    <div id="support-list" class="support-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ TAB: STUDENTS ════════════════════════════════════════════════ -->
+        <div class="tab-page" id="tab-students">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Student Directory</h1>
+                    <p class="page-sub" id="table-subtitle">Loading records…</p>
+                </div>
+                <button id="btn-open-add-drawer" class="btn btn-primary">
+                    <i class="fa-solid fa-user-plus"></i> Add Student
+                </button>
+            </div>
+
+            <!-- Filter bar -->
+            <div class="filter-bar card glass-card">
+                <div class="filter-bar-inner">
+                    <div class="input-wrapper filter-search-wrap">
+                        <i class="fa-solid fa-magnifying-glass input-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search by name…">
                     </div>
-                    <div class="table-container">
-                        <table class="students-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>ID</th>
-                                    <th>Name / Email</th>
-                                    <th>Major</th>
-                                    <th>Year</th>
-                                    <th>Grade</th>
-                                    <th>GPA</th>
-                                    <th>Standing</th>
-                                    <th class="text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="students-table-body">
-                                <tr>
-                                    <td colspan="9" class="table-loading">
-                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading student records…
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="input-wrapper select-wrapper filter-sel">
+                        <i class="fa-solid fa-book input-icon"></i>
+                        <input type="text" id="filter-major" placeholder="Major">
+                    </div>
+                    <div class="input-wrapper select-wrapper filter-sel">
+                        <i class="fa-solid fa-calendar-days input-icon"></i>
+                        <select id="filter-year">
+                            <option value="">Any Year</option>
+                            <option value="Freshman">Freshman</option>
+                            <option value="Sophomore">Sophomore</option>
+                            <option value="Junior">Junior</option>
+                            <option value="Senior">Senior</option>
+                            <option value="Graduate">Graduate</option>
+                        </select>
+                    </div>
+                    <div class="input-wrapper select-wrapper filter-sel">
+                        <i class="fa-solid fa-chart-bar input-icon"></i>
+                        <select id="filter-standing">
+                            <option value="">Any Standing</option>
+                            <option value="Dean's List">Dean's List</option>
+                            <option value="Good Standing">Good Standing</option>
+                            <option value="Satisfactory">Satisfactory</option>
+                            <option value="Academic Warning">Academic Warning</option>
+                            <option value="Academic Probation">Academic Probation</option>
+                        </select>
+                    </div>
+                    <div class="input-wrapper filter-grade-wrap">
+                        <i class="fa-solid fa-arrow-down input-icon"></i>
+                        <input type="number" id="filter-min-grade" min="0" max="100" placeholder="Min grade">
+                    </div>
+                    <div class="filter-btns">
+                        <button id="btn-apply-filter" class="btn btn-primary btn-sm">
+                            <i class="fa-solid fa-filter"></i> Filter
+                        </button>
+                        <button id="btn-clear-filter" class="btn btn-secondary btn-sm">
+                            <i class="fa-solid fa-xmark"></i> Clear
+                        </button>
+                    </div>
+                </div>
+                <!-- Sort -->
+                <div class="sort-bar">
+                    <span class="sort-label">Sort:</span>
+                    <button id="btn-sort-asc" class="btn btn-icon btn-secondary" title="Low → High">
+                        <i class="fa-solid fa-arrow-up-1-9"></i>
+                    </button>
+                    <button id="btn-sort-desc" class="btn btn-icon btn-secondary" title="High → Low">
+                        <i class="fa-solid fa-arrow-down-9-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search result banner -->
+            <div id="search-result-container" class="search-result-box hidden">
+                <div class="search-result-detail">
+                    <span class="result-label">Result Found:</span>
+                    <div class="result-info">
+                        <strong id="result-name"></strong>
+                        <span id="result-id" class="result-badge"></span>
+                        <span id="result-grade" class="result-grade-val"></span>
+                    </div>
+                </div>
+                <div class="search-result-actions">
+                    <button id="btn-search-locate" class="btn btn-sm btn-info">
+                        <i class="fa-solid fa-eye"></i> Focus Row
+                    </button>
+                    <button id="btn-search-clear" class="btn btn-sm btn-clear">
+                        <i class="fa-solid fa-xmark"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="card glass-card table-card">
+                <div class="table-container">
+                    <table class="students-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>ID</th>
+                                <th>Name / Email</th>
+                                <th>Major</th>
+                                <th>Year</th>
+                                <th>Grade</th>
+                                <th>GPA</th>
+                                <th>Standing</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="students-table-body">
+                            <tr>
+                                <td colspan="9" class="table-loading">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> Loading student records…
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ TAB: ANALYTICS ═══════════════════════════════════════════════ -->
+        <div class="tab-page" id="tab-analytics">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Analytics</h1>
+                    <p class="page-sub">Deep-dive into class performance data</p>
+                </div>
+                <button id="btn-refresh-analytics" class="btn btn-secondary">
+                    <i class="fa-solid fa-rotate-right"></i> Refresh
+                </button>
+            </div>
+
+            <div class="analytics-grid">
+                <!-- Grade Distribution -->
+                <div class="card glass-card analytics-chart-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-chart-column" style="color:var(--info);"></i> Grade Distribution</h2>
+                    </div>
+                    <div class="card-body chart-body">
+                        <canvas id="analytics-grade-bar"></canvas>
+                    </div>
+                </div>
+
+                <!-- Standing Distribution -->
+                <div class="card glass-card analytics-chart-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-chart-pie" style="color:var(--primary);"></i> Academic Standing</h2>
+                    </div>
+                    <div class="card-body chart-body donut-body">
+                        <canvas id="analytics-standing-donut"></canvas>
+                    </div>
+                </div>
+
+                <!-- Pass / Fail -->
+                <div class="card glass-card analytics-chart-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-circle-half-stroke" style="color:var(--success);"></i> Pass / Fail Ratio</h2>
+                    </div>
+                    <div class="card-body chart-body donut-body">
+                        <canvas id="analytics-passfail-donut"></canvas>
+                    </div>
+                </div>
+
+                <!-- Major Distribution -->
+                <div class="card glass-card analytics-chart-card analytics-chart-wide">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-building-columns" style="color:var(--amber, #f59e0b);"></i> Students by Major</h2>
+                    </div>
+                    <div class="card-body chart-body">
+                        <canvas id="analytics-major-bar"></canvas>
                     </div>
                 </div>
             </div>
-        </main>
+
+            <div id="analytics-empty" class="analytics-empty hidden">
+                <i class="fa-solid fa-chart-pie" style="font-size:3rem;opacity:0.2;display:block;margin-bottom:1rem;"></i>
+                <p>No data yet. Add some students to see analytics.</p>
+            </div>
+        </div>
     </div>
 
-    <!-- ── Edit Student Modal ───────────────────────────────────────────── -->
+    <!-- ══ Add Student Drawer ═══════════════════════════════════════════════ -->
+    <div class="drawer-overlay hidden" id="add-drawer-overlay"></div>
+    <aside class="drawer hidden" id="add-drawer">
+        <div class="drawer-header">
+            <h3><i class="fa-solid fa-user-plus"></i> Add New Student</h3>
+            <button class="btn-close" id="btn-close-add-drawer"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="drawer-body">
+            <form id="add-student-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="student-name">Full Name <span class="req">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="fa-regular fa-user input-icon"></i>
+                            <input type="text" id="student-name" placeholder="e.g. Samin Ahmed" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="student-grade">Grade (0–100) <span class="req">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-percent input-icon"></i>
+                            <input type="number" id="student-grade" min="0" max="100" step="0.1" placeholder="e.g. 85" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="student-email">Email</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-envelope input-icon"></i>
+                            <input type="email" id="student-email" placeholder="student@uni.edu">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="student-major">Major / Program</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-book input-icon"></i>
+                            <input type="text" id="student-major" placeholder="e.g. Computer Science">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="student-year">Academic Year</label>
+                        <div class="input-wrapper select-wrapper">
+                            <i class="fa-solid fa-calendar-days input-icon"></i>
+                            <select id="student-year">
+                                <option value="">— Select Year —</option>
+                                <option value="Freshman">Freshman</option>
+                                <option value="Sophomore">Sophomore</option>
+                                <option value="Junior">Junior</option>
+                                <option value="Senior">Senior</option>
+                                <option value="Graduate">Graduate</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="student-gpa">GPA (0.0–4.0)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-medal input-icon"></i>
+                            <input type="number" id="student-gpa" min="0" max="4" step="0.01" placeholder="e.g. 3.50">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Enrolled Courses</label>
+                    <div id="add-courses-list" class="courses-list"></div>
+                    <button type="button" id="btn-add-course" class="btn btn-sm btn-ghost mt-sm">
+                        <i class="fa-solid fa-plus"></i> Add Course
+                    </button>
+                </div>
+                <div class="form-group">
+                    <label for="student-notes">Academic Notes</label>
+                    <textarea id="student-notes" rows="2" placeholder="Optional notes about this student…"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fa-solid fa-plus"></i> Add Student
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- ── Edit Student Modal ─────────────────────────────────────────────── -->
     <div id="edit-modal" class="modal-overlay hidden">
         <div class="modal glass-modal animate-scale">
             <div class="modal-header">
@@ -342,10 +414,9 @@
                 <button id="modal-close" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="modal-body">
-                <p class="modal-desc">Editing: <strong id="modal-student-name">Student</strong> &nbsp;<span id="modal-student-id" class="result-badge"></span></p>
+                <p class="modal-desc">Editing: <strong id="modal-student-name">Student</strong>&nbsp;<span id="modal-student-id" class="result-badge"></span></p>
                 <form id="edit-grade-form">
                     <input type="hidden" id="edit-student-id">
-                    <!-- Row 1 -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-student-grade">Grade (0–100) <span class="req">*</span></label>
@@ -362,7 +433,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Row 2 -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-student-email">Email</label>
@@ -379,7 +449,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Row 3 -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-student-year">Academic Year</label>
@@ -396,7 +465,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Courses -->
                     <div class="form-group">
                         <label>Courses &amp; Grades</label>
                         <div id="edit-courses-list" class="courses-list"></div>
@@ -404,7 +472,6 @@
                             <i class="fa-solid fa-plus"></i> Add Course
                         </button>
                     </div>
-                    <!-- Notes -->
                     <div class="form-group">
                         <label for="edit-student-notes">Academic Notes</label>
                         <textarea id="edit-student-notes" rows="2" placeholder="Optional notes…"></textarea>
@@ -418,23 +485,43 @@
         </div>
     </div>
 
-    <!-- ── Detail / Profile Modal ──────────────────────────────────────── -->
+    <!-- ── Detail / Profile Modal ─────────────────────────────────────────── -->
     <div id="detail-modal" class="modal-overlay hidden">
         <div class="modal glass-modal modal-wide animate-scale">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-id-card"></i> Student Profile</h3>
                 <button id="detail-modal-close" class="btn-close"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="modal-body" id="detail-modal-body">
-                <!-- Populated by JS -->
+            <div class="modal-body" id="detail-modal-body"></div>
+        </div>
+    </div>
+
+    <!-- ── Delete Confirm Modal ───────────────────────────────────────────── -->
+    <div id="delete-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal modal-sm animate-scale">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-trash-can" style="color:var(--danger);"></i> Confirm Delete</h3>
+                <button class="btn-close" id="delete-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-muted);margin-bottom:0.5rem;">Are you sure you want to remove</p>
+                <p style="font-weight:700;font-size:1.05rem;color:#fff;" id="delete-confirm-name"></p>
+                <p style="color:var(--text-dim);font-size:0.85rem;margin-top:0.25rem;">This action cannot be undone.</p>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="delete-cancel-btn">Cancel</button>
+                    <button class="btn btn-danger" id="delete-confirm-btn">
+                        <i class="fa-solid fa-trash-can"></i> Delete
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ── Toast Notification Container ───────────────────────────────── -->
+    <!-- ── Toast Container ────────────────────────────────────────────────── -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- ── Scripts ─────────────────────────────────────────────────────── -->
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
