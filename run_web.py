@@ -2,14 +2,14 @@ import os
 from datetime import date, datetime
 from flask import Flask, jsonify, request, render_template
 
-from app.storage.json_storage import JsonStorage
+from app.storage.sqlite_storage import SqliteStorage
 from app.storage.deadline_storage import DeadlineStorage
 from app.services.student_manager import StudentManager
 from app.services.statistics_service import StatisticsService
 from app.services.insights_service import InsightsService
 from app.models.student import Student, CourseGrade
 from app.models.deadline import Deadline
-from app.config import MIN_GRADE, MAX_GRADE, PASSING_THRESHOLD
+from app.config import MIN_GRADE, MAX_GRADE, PASSING_THRESHOLD, DEFAULT_DB_FILE
 
 # Set directories relative to this file
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'app', 'templates'))
@@ -18,7 +18,7 @@ static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'app', 'sta
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
 # Initialize Storage & StudentManager
-storage = JsonStorage()
+storage = SqliteStorage(DEFAULT_DB_FILE)
 manager = StudentManager(storage)
 manager.load()
 
@@ -52,6 +52,9 @@ def student_to_payload(s: Student, index: int) -> dict:
         "courses": [c.to_dict() for c in s.courses],
         "notes": s.notes,
         "standing": s.academic_standing(),
+        "linkedin_url": s.linkedin_url,
+        "department": s.department,
+        "groups": s.groups,
     }
 
 
@@ -118,6 +121,10 @@ def add_student():
         except (ValueError, TypeError):
             return jsonify({"success": False, "error": "GPA must be a number."}), 400
 
+    # Parse optional groups list
+    raw_groups = data.get("groups") or []
+    groups = [str(g).strip() for g in raw_groups if str(g).strip()]
+
     try:
         student = manager.add_student(
             name=name,
@@ -128,6 +135,9 @@ def add_student():
             gpa=gpa,
             courses=courses,
             notes=data.get("notes", ""),
+            linkedin_url=data.get("linkedin_url", ""),
+            department=data.get("department", ""),
+            groups=groups,
         )
         if not manager.save():
             # Roll back: remove the student that was just added in memory.
@@ -168,6 +178,13 @@ def update_student(student_id):
         fields["academic_year"] = str(data["academic_year"])
     if "notes" in data:
         fields["notes"] = str(data["notes"])
+    if "linkedin_url" in data:
+        fields["linkedin_url"] = str(data["linkedin_url"])
+    if "department" in data:
+        fields["department"] = str(data["department"])
+    if "groups" in data:
+        raw_groups = data["groups"] or []
+        fields["groups"] = [str(g).strip() for g in raw_groups if str(g).strip()]
 
     if "gpa" in data:
         if data["gpa"] in (None, ""):
@@ -203,6 +220,9 @@ def update_student(student_id):
         "gpa": existing.gpa,
         "courses": existing.courses,
         "notes": existing.notes,
+        "linkedin_url": existing.linkedin_url,
+        "department": existing.department,
+        "groups": existing.groups,
     }
 
     try:
@@ -236,6 +256,56 @@ def delete_student(student_id):
             "success": True,
             "student": {"name": student.name, "grade": student.grade}
         })
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+# ---------------------------------------------------------------------------
+# Groups & Departments
+# ---------------------------------------------------------------------------
+
+@app.route('/api/groups', methods=['GET'])
+def get_groups():
+    """Return all distinct group names across the roster."""
+    return jsonify(manager.list_groups())
+
+
+@app.route('/api/departments', methods=['GET'])
+def get_departments():
+    """Return all distinct non-empty department names across the roster."""
+    return jsonify(manager.list_departments())
+
+
+@app.route('/api/students/<student_id>/groups', methods=['POST'])
+def add_student_to_group(student_id):
+    """Add a student to a group.  Body: {"group": "Group Name"}"""
+    data = request.json or {}
+    group = (data.get("group") or "").strip()
+    if not group:
+        return jsonify({"success": False, "error": "group is required."}), 400
+    try:
+        student = manager.assign_group(student_id, group)
+        if not manager.save():
+            manager.remove_from_group(student_id, group)
+            return jsonify({"success": False, "error": "Could not save group assignment."}), 500
+        students = manager.get_all_students()
+        idx = next((i for i, s in enumerate(students) if s.id == student.id), 0)
+        return jsonify({"success": True, "student": student_to_payload(student, idx)})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route('/api/students/<student_id>/groups/<group_name>', methods=['DELETE'])
+def remove_student_from_group(student_id, group_name):
+    """Remove a student from a group."""
+    try:
+        student = manager.remove_from_group(student_id, group_name)
+        if not manager.save():
+            manager.assign_group(student_id, group_name)
+            return jsonify({"success": False, "error": "Could not save group removal."}), 500
+        students = manager.get_all_students()
+        idx = next((i for i, s in enumerate(students) if s.id == student.id), 0)
+        return jsonify({"success": True, "student": student_to_payload(student, idx)})
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 400
 

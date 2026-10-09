@@ -175,3 +175,70 @@ Ran 147 tests in 0.033s  OK
 | 5 — Demo roster | 147 OK | 147 OK | 0 |
 
 All results recorded from actual terminal runs. No test results are fabricated.
+
+---
+
+## Session 2 — Stage 1: SQL persistence (SQLite)
+
+### Goal
+Introduce SQLite as the primary storage backend; migrate existing JSON data; preserve all existing student records and UUIDs.
+
+### Prompt used
+> Extend the student-grade app with SQL persistence using SQLite if none exists. First inspect the current models, persistence, CSV import, and student UI. Complete stage 1 only: SQL schema, connection configuration, and migration of existing data. Make minimal changes, avoid unrelated refactors and unnecessary dependencies, never expose credentials.
+
+### Findings before change
+- Persistence used `JsonStorage` (flat JSON file at `data/students.json`).
+- `BaseStorage` ABC already defined the `save`/`load` contract, making a drop-in SQLite backend straightforward.
+- `requirements.txt` listed only `flask` and `gunicorn` — no database library needed; Python's stdlib `sqlite3` covers the requirement.
+- 9 real students in `data/students.json` with full UUIDs that must be preserved.
+
+### Changes made
+
+| File | Change |
+|---|---|
+| `app/storage/sqlite_storage.py` | **New file** — `SqliteStorage(BaseStorage)` using stdlib `sqlite3`. Single persistent connection per instance (required for `:memory:` databases in tests). Schema v1: `students` table with all existing fields (`id`, `name`, `grade`, `email`, `major`, `academic_year`, `gpa`, `courses` as JSON blob, `notes`). Atomic save via DELETE-all + bulk INSERT in one transaction. |
+| `app/config.py` | Added `DEFAULT_DB_FILE` path constant (`data/students.db`). |
+| `run_web.py` | Swapped `JsonStorage()` import and instantiation to `SqliteStorage(DEFAULT_DB_FILE)`. Two lines changed. |
+| `migrate_to_sqlite.py` | **New file** — one-shot migration script. Reads `data/students.json` via `JsonStorage`, writes to `data/students.db` via `SqliteStorage`. Original JSON file is not modified. Safe to re-run (full table replace). |
+| `tests/test_sqlite_storage.py` | **New file** — 13 focused tests: schema init, empty-load, single/multi round-trips, UUID preservation, all-fields preservation, null GPA, empty/multi courses, save-replaces, no-duplicate, and JSON-migration round-trip. |
+
+### Migration verification (actual terminal output)
+```
+python migrate_to_sqlite.py
+# Loaded 9 student(s) from ...data/students.json
+# Migrated 9 student(s) -> ...data/students.db
+
+python -c "
+from app.storage.sqlite_storage import SqliteStorage
+from app.config import DEFAULT_DB_FILE
+store = SqliteStorage(DEFAULT_DB_FILE)
+students = store.load()
+print('Students in DB:', len(students))
+for s in students:
+    print(f'  {s.name} (grade={s.grade}, id={s.id})')
+"
+# Students in DB: 9
+#   affan  (grade=92.0, id=5debaf7a-...)
+#   ezaz   (grade=88.0, id=d9c9968d-...)
+#   samin  (grade=77.0, id=47bd0571-...)
+#   noor   (grade=76.0, id=0d160aaf-...)
+#   huzaifa(grade=79.0, id=8ff57dd7-...)
+#   daniyal(grade=45.0, id=154d99ba-...)
+#   ahmed  (grade=66.0, id=a17e37b8-...)
+#   Dylan  (grade=90.0, id=5ffb35a2-...)
+#   Dylan  (grade=95.0, id=4922392b-...)
+```
+All 9 original UUIDs preserved exactly.
+
+### Test suite
+```
+python -m unittest discover -s tests -q
+Ran 160 tests in 0.074s  OK   (13 new SQLite tests added, all passed)
+```
+
+### Evidence summary
+
+| Session | Tests before | Tests after | New tests |
+|---|---|---|---|
+| Stage 1 — SQLite storage | 147 OK | 160 OK | 13 |
+

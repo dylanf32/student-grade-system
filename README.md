@@ -1,6 +1,6 @@
 # 📚 Student Grade Management System
 
-A **modular, scalable, and clean** console-based application for managing student grades built in Python.
+A **modular, scalable, and clean** Python application for managing student grades — available as both a **web dashboard** (Flask) and a **console interface**.
 
 ---
 <p align="center">
@@ -18,7 +18,8 @@ A **modular, scalable, and clean** console-based application for managing studen
 ```
 student-grade-system/
 │
-├── main.py                          # Entry point — wires all layers
+├── main.py                          # Console entry point — wires all layers
+├── run_web.py                       # Web dashboard entry point (Flask)
 │
 ├── app/                             # Application package
 │   ├── __init__.py
@@ -26,7 +27,8 @@ student-grade-system/
 │   │
 │   ├── models/                      # Data layer
 │   │   ├── __init__.py
-│   │   └── student.py               # Student entity class
+│   │   ├── student.py               # Student entity class
+│   │   └── deadline.py              # Deadline entity class
 │   │
 │   ├── validators/                  # Validation layer
 │   │   ├── __init__.py
@@ -35,14 +37,23 @@ student-grade-system/
 │   ├── storage/                     # Persistence layer (pluggable)
 │   │   ├── __init__.py
 │   │   ├── base_storage.py          # Abstract interface
-│   │   └── json_storage.py          # JSON file implementation
+│   │   ├── json_storage.py          # JSON file implementation (students)
+│   │   └── deadline_storage.py      # JSON file implementation (deadlines)
 │   │
 │   ├── services/                    # Business logic layer
 │   │   ├── __init__.py
 │   │   ├── student_manager.py       # CRUD + search + sort
-│   │   └── statistics_service.py    # Grade statistics computation
+│   │   ├── statistics_service.py    # Grade statistics computation
+│   │   └── insights_service.py      # At-risk student flagging
 │   │
-│   └── ui/                          # Presentation layer
+│   ├── templates/
+│   │   └── index.html               # Single-page web dashboard
+│   │
+│   ├── static/
+│   │   ├── css/style.css            # Dashboard styles
+│   │   └── js/app.js                # Dashboard frontend controller
+│   │
+│   └── ui/                          # Console presentation layer
 │       ├── __init__.py
 │       ├── colors.py                # ANSI color utilities
 │       ├── display.py               # Console rendering helpers
@@ -54,12 +65,16 @@ student-grade-system/
 │   ├── test_student.py
 │   ├── test_student_manager.py
 │   ├── test_statistics.py
+│   ├── test_insights.py
 │   ├── test_validators.py
-│   └── test_storage.py
+│   ├── test_storage.py
+│   └── test_regression.py
 │
 ├── data/                            # Persistent storage (auto-created)
-│   └── students.json
+│   ├── students.json
+│   └── deadlines.json
 │
+├── requirements.txt
 └── README.md
 ```
 
@@ -81,20 +96,47 @@ student-grade-system/
 
 ## 🚀 How to Run
 
+### Web Dashboard (recommended)
+
 ```bash
-# Run the application
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the Flask server
+python run_web.py
+```
+
+Then open **http://localhost:5000** in your browser.
+
+### Console Interface
+
+```bash
 python main.py
+```
 
-# Run all tests
+### Tests
+
+```bash
 python -m pytest tests/ -v
-
-# Or with unittest
-python -m unittest discover -s tests -v
 ```
 
 ---
 
 ## 📋 Features
+
+### 🌐 Web Dashboard
+
+| Feature | Description |
+|---|---|
+| **Student Directory** | Add, edit, delete, search, filter, and sort students in a live table |
+| **Grade Statistics** | Class average, highest grade, passing rate, and avg GPA — animated stat cards |
+| **Analytics Charts** | Grade distribution, academic standing donut, pass/fail ratio, students by major |
+| **At-Risk Panel** | Automatically flags students below the passing threshold |
+| **Deadline Reminders** | Track assignment, exam, and project due dates with 7 / 3 / 1-day toast notifications |
+| **Deadlines Tab** | Full CRUD table for all deadlines — add, edit, delete, with urgency colour-coding |
+| **Persistent Storage** | All data saved to JSON files; atomic writes prevent data loss |
+
+### 🖥️ Console Interface
 
 | # | Feature | Menu Option |
 |---|---|---|
@@ -115,8 +157,10 @@ python -m unittest discover -s tests -v
 - **test_student.py** — Model creation, validation, serialization, equality
 - **test_student_manager.py** — CRUD, search, sort, persistence (with FakeStorage)
 - **test_statistics.py** — Compute, accessors, empty-list edge cases
+- **test_insights.py** — At-risk flagging, threshold boundaries, InsightsService
 - **test_validators.py** — Name, grade, index validation + boundary cases
 - **test_storage.py** — JSON roundtrip, missing file, corrupted file handling
+- **test_regression.py** — Decimal grades, threshold boundaries, bare-filename storage, duplicate name search
 
 
 ## License

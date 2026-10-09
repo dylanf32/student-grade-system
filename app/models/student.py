@@ -55,6 +55,9 @@ class Student:
         _gpa           (float | None):        Cumulative GPA (0.0–4.0, optional).
         _courses       (List[CourseGrade]):   Enrolled courses with individual grades.
         _notes         (str):                 Free-text academic notes/status.
+        _linkedin_url  (str):                 LinkedIn profile URL (optional).
+        _department    (str):                 Academic department (optional).
+        _groups        (List[str]):           Group names the student belongs to.
     """
 
     # ── Construction ─────────────────────────────────────────────────────
@@ -70,6 +73,9 @@ class Student:
         gpa: float | None = None,
         courses: List[CourseGrade] | None = None,
         notes: str = "",
+        linkedin_url: str = "",
+        department: str = "",
+        groups: List[str] | None = None,
     ) -> None:
         if not name or not name.strip():
             raise ValueError("Student name cannot be empty.")
@@ -89,6 +95,9 @@ class Student:
         self._gpa: float | None = gpa
         self._courses: List[CourseGrade] = courses if courses is not None else []
         self._notes: str = notes.strip() if notes else ""
+        self._linkedin_url: str = linkedin_url.strip() if linkedin_url else ""
+        self._department: str = department.strip() if department else ""
+        self._groups: List[str] = list(groups) if groups is not None else []
 
     # ── Properties ───────────────────────────────────────────────────────
 
@@ -169,6 +178,30 @@ class Student:
     def notes(self, value: str) -> None:
         self._notes = value.strip() if value else ""
 
+    @property
+    def linkedin_url(self) -> str:
+        return self._linkedin_url
+
+    @linkedin_url.setter
+    def linkedin_url(self, value: str) -> None:
+        self._linkedin_url = value.strip() if value else ""
+
+    @property
+    def department(self) -> str:
+        return self._department
+
+    @department.setter
+    def department(self, value: str) -> None:
+        self._department = value.strip() if value else ""
+
+    @property
+    def groups(self) -> List[str]:
+        return list(self._groups)
+
+    @groups.setter
+    def groups(self, value: List[str]) -> None:
+        self._groups = list(value) if value is not None else []
+
     # ── Computed helpers ─────────────────────────────────────────────────
 
     def compute_gpa_from_courses(self) -> float | None:
@@ -227,6 +260,9 @@ class Student:
             "gpa": self._gpa,
             "courses": [c.to_dict() for c in self._courses],
             "notes": self._notes,
+            "linkedin_url": self._linkedin_url,
+            "department": self._department,
+            "groups": list(self._groups),
         }
 
     @classmethod
@@ -250,6 +286,9 @@ class Student:
             except (KeyError, ValueError):
                 pass  # skip malformed course entries
 
+        raw_groups = data.get("groups") or []
+        groups = [g for g in raw_groups if isinstance(g, str) and g.strip()]
+
         return cls(
             name=name,
             grade=grade,
@@ -260,6 +299,9 @@ class Student:
             gpa=data.get("gpa"),
             courses=courses,
             notes=data.get("notes", ""),
+            linkedin_url=data.get("linkedin_url", ""),
+            department=data.get("department", ""),
+            groups=groups,
         )
 
     # ── Dunder Methods ───────────────────────────────────────────────────

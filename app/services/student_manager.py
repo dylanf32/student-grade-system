@@ -47,6 +47,9 @@ class StudentManager:
         gpa: Optional[float] = None,
         courses: Optional[List[CourseGrade]] = None,
         notes: str = "",
+        linkedin_url: str = "",
+        department: str = "",
+        groups: Optional[List[str]] = None,
     ) -> Student:
         """Creates and appends a new Student.
 
@@ -59,6 +62,9 @@ class StudentManager:
             gpa:           Cumulative GPA 0–4 (optional).
             courses:       List of CourseGrade objects (optional).
             notes:         Free-text notes (optional).
+            linkedin_url:  LinkedIn profile URL (optional).
+            department:    Academic department (optional).
+            groups:        List of group name strings (optional).
 
         Returns:
             The newly created Student object.
@@ -83,6 +89,9 @@ class StudentManager:
             gpa=gpa,
             courses=courses,
             notes=notes,
+            linkedin_url=linkedin_url,
+            department=department,
+            groups=groups,
         )
         with self._lock:
             self._students.append(student)
@@ -143,7 +152,8 @@ class StudentManager:
     def update_student(self, student_id: str, **fields) -> Student:
         """Updates arbitrary fields of a student identified by UUID.
 
-        Supported fields: grade, email, major, academic_year, gpa, courses, notes.
+        Supported fields: grade, email, major, academic_year, gpa, courses, notes,
+        linkedin_url, department, groups.
         Fields not provided are left unchanged.
 
         Args:
@@ -179,6 +189,12 @@ class StudentManager:
                 student.courses = fields["courses"]
             if "notes" in fields:
                 student.notes = fields["notes"]
+            if "linkedin_url" in fields:
+                student.linkedin_url = fields["linkedin_url"]
+            if "department" in fields:
+                student.department = fields["department"]
+            if "groups" in fields:
+                student.groups = fields["groups"]
 
             return student
 
@@ -402,3 +418,84 @@ class StudentManager:
                     errors.append(f"Row {line_num} ({name!r}): {exc} — skipped.")
 
         return imported, errors
+
+    # ═══════════════════════════════════════════════════════════════════════
+    #  Group Management
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def list_groups(self) -> List[str]:
+        """Returns a sorted list of all distinct group names in the roster."""
+        with self._lock:
+            groups: set = set()
+            for s in self._students:
+                groups.update(s.groups)
+        return sorted(groups)
+
+    def list_departments(self) -> List[str]:
+        """Returns a sorted list of all distinct non-empty departments."""
+        with self._lock:
+            depts = {s.department for s in self._students if s.department}
+        return sorted(depts)
+
+    def assign_group(self, student_id: str, group_name: str) -> Student:
+        """Add ``group_name`` to a student's group list (idempotent).
+
+        Args:
+            student_id: Stable UUID of the target student.
+            group_name: Group name to add (stripped).
+
+        Returns:
+            The updated Student.
+
+        Raises:
+            ValueError: If student not found or group_name is empty.
+        """
+        group_name = group_name.strip()
+        if not group_name:
+            raise ValueError("Group name cannot be empty.")
+        with self._lock:
+            student = next((s for s in self._students if s.id == student_id), None)
+            if student is None:
+                raise ValueError("Student not found.")
+            if group_name not in student.groups:
+                student.groups = student.groups + [group_name]
+        return student
+
+    def remove_from_group(self, student_id: str, group_name: str) -> Student:
+        """Remove ``group_name`` from a student's group list (idempotent).
+
+        Args:
+            student_id: Stable UUID of the target student.
+            group_name: Group name to remove.
+
+        Returns:
+            The updated Student.
+
+        Raises:
+            ValueError: If student not found.
+        """
+        with self._lock:
+            student = next((s for s in self._students if s.id == student_id), None)
+            if student is None:
+                raise ValueError("Student not found.")
+            student.groups = [g for g in student.groups if g != group_name]
+        return student
+
+    def filter_by_group(self, group_name: str) -> List[Tuple[int, Student]]:
+        """Return (index, student) pairs for students in ``group_name``."""
+        with self._lock:
+            return [
+                (i, s)
+                for i, s in enumerate(self._students)
+                if group_name in s.groups
+            ]
+
+    def filter_by_department(self, department: str) -> List[Tuple[int, Student]]:
+        """Return (index, student) pairs for students in ``department`` (case-insensitive)."""
+        dept_lower = department.strip().lower()
+        with self._lock:
+            return [
+                (i, s)
+                for i, s in enumerate(self._students)
+                if s.department.lower() == dept_lower
+            ]

@@ -15,6 +15,7 @@ MAX_GRADE: int = 100
 BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR: str = os.path.join(BASE_DIR, "data")
 DEFAULT_DATA_FILE: str = os.path.join(DATA_DIR, "students.json")
+DEFAULT_DB_FILE: str = os.path.join(DATA_DIR, "students.db")
 
 # ── Passing Threshold ────────────────────────────────────────────────────
 # Single authoritative value used by statistics, validation, and the frontend.
