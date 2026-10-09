@@ -242,3 +242,40 @@ Ran 160 tests in 0.074s  OK   (13 new SQLite tests added, all passed)
 |---|---|---|---|
 | Stage 1 — SQLite storage | 147 OK | 160 OK | 13 |
 
+
+---
+
+## Session 2 — Stage 2: Student fields and group/department management
+
+### Goal
+Add `linkedin_url`, `department`, and `groups` to the Student model and SQLite schema; add group and department management helpers to `StudentManager`; expose all new fields through the web API.
+
+### Prompt used
+> work baby (Stage 2 continuation)
+
+### Changes made
+
+| File | Change |
+|---|---|
+| `app/models/student.py` | Added `linkedin_url`, `department`, `groups` constructor params (all optional, default empty). Added properties + setters for each. Updated `to_dict()` and `from_dict()` (backward-compatible — legacy records without these keys load cleanly). |
+| `app/storage/sqlite_storage.py` | Schema updated to v2: new columns `linkedin_url TEXT`, `department TEXT`, `groups TEXT` in `CREATE TABLE`. Added `_add_column_if_missing()` to `ALTER TABLE` any pre-existing v1 database automatically on startup. `_student_to_row` and `_row_to_student` updated to handle all three new fields. |
+| `app/services/student_manager.py` | `add_student()` and `update_student()` accept `linkedin_url`, `department`, `groups`. New group-management helpers: `list_groups()`, `list_departments()`, `assign_group()`, `remove_from_group()`, `filter_by_group()`, `filter_by_department()`. |
+| `run_web.py` | `student_to_payload()` includes `linkedin_url`, `department`, `groups`. POST `/api/students` and PUT `/api/students/<id>` parse and forward new fields; rollback snapshot extended. New routes: `GET /api/groups`, `GET /api/departments`, `POST /api/students/<id>/groups`, `DELETE /api/students/<id>/groups/<name>`. |
+| `tests/test_stage2_fields.py` | **New file** — 24 tests: model defaults, constructor, setters, `to_dict`/`from_dict`, backward compat, copy-on-read; SQLite round-trips; manager `assign_group`, `remove_from_group`, `filter_by_group`, `filter_by_department`, `add_student`, `update_student`, save/reload. |
+
+### Migration
+Re-ran `python migrate_to_sqlite.py` — 9 students re-written to DB with new columns populated as empty strings / `[]`.
+
+### Test suite
+```
+python -m unittest discover -s tests -q
+Ran 184 tests in 0.084s  OK   (24 new Stage 2 tests, all passed)
+```
+
+### Evidence summary
+
+| Session | Tests before | Tests after | New tests |
+|---|---|---|---|
+| Stage 1 — SQLite storage     | 147 OK | 160 OK | 13 |
+| Stage 2 — Fields & groups    | 160 OK | 184 OK | 24 |
+
