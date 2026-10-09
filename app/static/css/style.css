@@ -1248,3 +1248,112 @@ textarea:focus {
     .stats-grid { grid-template-columns: 1fr; }
     .analytics-grid { grid-template-columns: 1fr; }
 }
+
+
+/* ==========================================================================
+   DEADLINE SYSTEM
+   ========================================================================== */
+
+/* ── Nav badge (count pill on sidebar item) ─────────────────────────────── */
+.nav-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 99px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-left: auto;
+    line-height: 1;
+}
+.nav-badge.hidden { display: none; }
+
+/* ── Dashboard reminder panel ───────────────────────────────────────────── */
+.deadline-reminder-card { margin-top: 1.5rem; }
+
+.deadline-reminder-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.deadline-reminder-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: var(--border-radius-md);
+    background: rgba(255,255,255,0.03);
+    border-left: 3px solid transparent;
+    transition: var(--transition-base);
+}
+
+.dl-reminder-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius-sm);
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+
+.dl-reminder-info { flex: 1; min-width: 0; }
+.dl-reminder-title { font-weight: 600; font-size: 0.88rem; display: block; }
+.dl-reminder-course { font-size: 0.78rem; color: var(--text-muted); display: block; margin-top: 1px; }
+
+.dl-reminder-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.dl-days-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+
+.dl-date-str { font-size: 0.72rem; color: var(--text-dim); }
+
+/* ── Urgency colours ────────────────────────────────────────────────────── */
+.deadline-overdue  { border-left-color: var(--danger); }
+.deadline-overdue  .dl-reminder-icon  { background: var(--danger-bg);  color: var(--danger);  }
+.deadline-overdue  .dl-days-badge     { background: var(--danger-bg);  color: var(--danger);  }
+.deadline-overdue  .dl-reminder-title { color: var(--danger); }
+
+.deadline-critical { border-left-color: #f97316; }
+.deadline-critical .dl-reminder-icon  { background: rgba(249,115,22,.15); color: #f97316; }
+.deadline-critical .dl-days-badge     { background: rgba(249,115,22,.15); color: #f97316; }
+
+.deadline-high     { border-left-color: var(--warning); }
+.deadline-high     .dl-reminder-icon  { background: var(--warning-bg); color: var(--warning); }
+.deadline-high     .dl-days-badge     { background: var(--warning-bg); color: var(--warning); }
+
+.deadline-medium   { border-left-color: var(--info); }
+.deadline-medium   .dl-reminder-icon  { background: var(--info-bg);    color: var(--info);    }
+.deadline-medium   .dl-days-badge     { background: var(--info-bg);    color: var(--info);    }
+
+.deadline-none     { border-left-color: var(--text-dim); }
+.deadline-none     .dl-reminder-icon  { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+.deadline-none     .dl-days-badge     { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+
+/* ── Deadline table status badges ───────────────────────────────────────── */
+.deadline-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+/* inherits urgency colour classes defined above */
+
+/* ── Type badges in table ───────────────────────────────────────────────── */
+.badge-type-assignment { background: rgba(167,139,250,.15); color: #a78bfa; }
+.badge-type-exam       { background: rgba(248,113,113,.15); color: #f87171; }
+.badge-type-project    { background: rgba(56,189,248,.15);  color: #38bdf8; }
+.badge-type-other      { background: rgba(161,161,181,.12); color: var(--text-muted); }
