@@ -53,6 +53,70 @@ class InputValidator:
         return True, ""
 
     @staticmethod
+    def validate_gpa(gpa: object) -> Tuple[bool, str]:
+        """Validates an optional GPA value.
+
+        Accepts None, or a finite numeric (non-boolean) value in [0.0, 4.0].
+        Also accepts numeric strings (e.g. "3.5") for convenience.
+
+        Args:
+            gpa: The GPA value to validate (may be None).
+
+        Returns:
+            Tuple of (is_valid, error_message).
+        """
+        if gpa is None:
+            return True, ""
+        # Reject booleans before any conversion.
+        if isinstance(gpa, bool):
+            return False, "GPA must be a number."
+        # Accept numeric strings.
+        if isinstance(gpa, str):
+            try:
+                gpa = float(gpa)
+            except ValueError:
+                return False, "GPA must be a number."
+        if not isinstance(gpa, (int, float)):
+            return False, "GPA must be a number."
+        if math.isnan(gpa) or math.isinf(gpa):
+            return False, "GPA must be a finite number."
+        if gpa < 0.0 or gpa > 4.0:
+            return False, "GPA must be between 0.0 and 4.0."
+        return True, ""
+
+    @staticmethod
+    def validate_course_grade(grade: object) -> Tuple[bool, str]:
+        """Validates a per-course grade.
+
+        Accepts None (ungraded) or a finite numeric (non-boolean) value in [0, 100].
+        Also accepts numeric strings for convenience.
+
+        Args:
+            grade: The course grade to validate (may be None).
+
+        Returns:
+            Tuple of (is_valid, error_message).
+        """
+        if grade is None:
+            return True, ""
+        # Reject booleans before any conversion.
+        if isinstance(grade, bool):
+            return False, "Course grade must be a number."
+        # Accept numeric strings.
+        if isinstance(grade, str):
+            try:
+                grade = float(grade)
+            except ValueError:
+                return False, "Course grade must be a number."
+        if not isinstance(grade, (int, float)):
+            return False, "Course grade must be a number."
+        if math.isnan(grade) or math.isinf(grade):
+            return False, "Course grade must be a finite number."
+        if grade < 0 or grade > 100:
+            return False, "Course grade must be between 0 and 100."
+        return True, ""
+
+    @staticmethod
     def validate_index(index: int, list_size: int) -> Tuple[bool, str]:
         """Validates a list index.
 

@@ -214,6 +214,17 @@ class StudentManager:
                 raise ValueError(msg)
             return self._students.pop(index)
 
+    def insert_student_at(self, index: int, student: Student) -> None:
+        """Re-inserts a Student at ``index`` (used for delete rollback).
+
+        Args:
+            index:   Position to insert at (clamped to valid range).
+            student: The Student object to insert.
+        """
+        with self._lock:
+            index = max(0, min(index, len(self._students)))
+            self._students.insert(index, student)
+
     # ═══════════════════════════════════════════════════════════════════════
     #  Search & Filter
     # ═══════════════════════════════════════════════════════════════════════

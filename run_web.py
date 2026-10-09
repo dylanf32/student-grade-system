@@ -1,6 +1,7 @@
 import os
 from datetime import date, datetime
 from flask import Flask, jsonify, request, render_template
+from app.validators.input_validator import InputValidator as _IV
 
 from app.storage.sqlite_storage import SqliteStorage
 from app.storage.deadline_storage import DeadlineStorage
@@ -89,41 +90,82 @@ def get_students():
     return jsonify([student_to_payload(s, i) for i, s in enumerate(students)])
 
 
+def _parse_courses(raw_courses) -> tuple:
+    """Validate and parse a list of course dicts.
+
+    Returns (courses_list, error_string_or_None).
+    """
+    if not isinstance(raw_courses, list):
+        return None, "courses must be a list."
+    courses = []
+    for i, c in enumerate(raw_courses):
+        if not isinstance(c, dict):
+            return None, f"Course entry {i} must be an object."
+        name_val = c.get("course")
+        if not isinstance(name_val, str) or not name_val.strip():
+            return None, f"Course entry {i}: 'course' must be a nonempty string."
+        grade_val = c.get("grade")
+        valid, msg = _IV.validate_course_grade(grade_val)
+        if not valid:
+            return None, f"Course entry {i} ({name_val!r}): {msg}"
+        # Convert numeric string grade to float before constructing
+        if isinstance(grade_val, str):
+            grade_val = float(grade_val)
+        courses.append(CourseGrade(course=name_val.strip(), grade=grade_val))
+    return courses, None
+
+
 @app.route('/api/students', methods=['POST'])
 def add_student():
     """Add a new student with validation."""
-    data = request.json or {}
-    name = data.get("name", "").strip()
-    grade = data.get("grade")
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
 
-    if grade is None:
+    # --- name ---
+    name_raw = data.get("name")
+    if not isinstance(name_raw, str):
+        return jsonify({"success": False, "error": "name must be a string."}), 400
+    name = name_raw.strip()
+
+    # --- grade (required, no null, no boolean) ---
+    grade_raw = data.get("grade")
+    if grade_raw is None:
         return jsonify({"success": False, "error": "Grade is required."}), 400
-
+    if isinstance(grade_raw, bool):
+        return jsonify({"success": False, "error": "Grade must be a number."}), 400
     try:
-        grade_val = float(grade)
+        grade_val = float(grade_raw)
     except (ValueError, TypeError):
         return jsonify({"success": False, "error": "Grade must be a number."}), 400
 
-    # Parse optional courses list
+    # --- courses ---
     raw_courses = data.get("courses") or []
-    courses = []
-    for c in raw_courses:
-        try:
-            courses.append(CourseGrade.from_dict(c))
-        except (KeyError, ValueError) as e:
-            return jsonify({"success": False, "error": f"Invalid course entry: {e}"}), 400
+    courses, err = _parse_courses(raw_courses)
+    if err:
+        return jsonify({"success": False, "error": err}), 400
 
-    # Optional GPA
-    gpa = None
-    if data.get("gpa") not in (None, ""):
-        try:
-            gpa = float(data["gpa"])
-        except (ValueError, TypeError):
-            return jsonify({"success": False, "error": "GPA must be a number."}), 400
+    # --- GPA (optional) ---
+    gpa_raw = data.get("gpa")
+    if gpa_raw in (None, ""):
+        gpa = None
+    else:
+        valid, msg = _IV.validate_gpa(gpa_raw)
+        if not valid:
+            return jsonify({"success": False, "error": msg}), 400
+        gpa = float(gpa_raw) if isinstance(gpa_raw, str) else gpa_raw
 
-    # Parse optional groups list
+    # --- text fields: reject non-strings ---
+    for field in ("email", "major", "academic_year", "notes", "linkedin_url", "department"):
+        val = data.get(field)
+        if val is not None and not isinstance(val, str):
+            return jsonify({"success": False, "error": f"{field} must be a string."}), 400
+
+    # --- groups ---
     raw_groups = data.get("groups") or []
-    groups = [str(g).strip() for g in raw_groups if str(g).strip()]
+    if not isinstance(raw_groups, list):
+        return jsonify({"success": False, "error": "groups must be a list."}), 400
+    groups = [str(g).strip() for g in raw_groups if isinstance(g, str) and str(g).strip()]
 
     try:
         student = manager.add_student(
@@ -145,7 +187,7 @@ def add_student():
             rollback_idx = next((i for i, s in enumerate(all_students) if s.id == student.id), None)
             if rollback_idx is not None:
                 manager.remove_student(rollback_idx)
-            return jsonify({"success": False, "error": "Student could not be saved. Please try again."}), 500
+            return jsonify({"success": False, "error": "Student could not be saved. Please try again."}), 503
         students = manager.get_all_students()
         idx = next(i for i, s in enumerate(students) if s.id == student.id)
         return jsonify({"success": True, "student": student_to_payload(student, idx)})
@@ -158,51 +200,58 @@ def update_student(student_id):
     """Update a student's fields identified by their stable UUID.
 
     Accepts a partial update — only fields present in the JSON body are changed.
+    Validates ALL supplied fields before applying any.
     """
-    data = request.json or {}
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
 
-    # Build kwargs for update_student; convert types where needed.
+    # Validate all supplied fields first; collect into `fields` only after all pass.
     fields = {}
 
     if "grade" in data:
+        grade_raw = data["grade"]
+        if isinstance(grade_raw, bool):
+            return jsonify({"success": False, "error": "Grade must be a number."}), 400
         try:
-            fields["grade"] = float(data["grade"])
+            grade_parsed = float(grade_raw)
         except (ValueError, TypeError):
             return jsonify({"success": False, "error": "Grade must be a number."}), 400
+        valid, msg = _IV.validate_grade(grade_parsed)
+        if not valid:
+            return jsonify({"success": False, "error": msg}), 400
+        fields["grade"] = grade_parsed
 
-    if "email" in data:
-        fields["email"] = str(data["email"])
-    if "major" in data:
-        fields["major"] = str(data["major"])
-    if "academic_year" in data:
-        fields["academic_year"] = str(data["academic_year"])
-    if "notes" in data:
-        fields["notes"] = str(data["notes"])
-    if "linkedin_url" in data:
-        fields["linkedin_url"] = str(data["linkedin_url"])
-    if "department" in data:
-        fields["department"] = str(data["department"])
+    for field in ("email", "major", "academic_year", "notes", "linkedin_url", "department"):
+        if field in data:
+            val = data[field]
+            if not isinstance(val, str):
+                return jsonify({"success": False, "error": f"{field} must be a string."}), 400
+            fields[field] = val
+
     if "groups" in data:
-        raw_groups = data["groups"] or []
-        fields["groups"] = [str(g).strip() for g in raw_groups if str(g).strip()]
+        raw_groups = data["groups"]
+        if raw_groups is None:
+            raw_groups = []
+        if not isinstance(raw_groups, list):
+            return jsonify({"success": False, "error": "groups must be a list."}), 400
+        fields["groups"] = [str(g).strip() for g in raw_groups if isinstance(g, str) and str(g).strip()]
 
     if "gpa" in data:
-        if data["gpa"] in (None, ""):
+        gpa_raw = data["gpa"]
+        if gpa_raw in (None, ""):
             fields["gpa"] = None
         else:
-            try:
-                fields["gpa"] = float(data["gpa"])
-            except (ValueError, TypeError):
-                return jsonify({"success": False, "error": "GPA must be a number."}), 400
+            valid, msg = _IV.validate_gpa(gpa_raw)
+            if not valid:
+                return jsonify({"success": False, "error": msg}), 400
+            fields["gpa"] = float(gpa_raw) if isinstance(gpa_raw, str) else gpa_raw
 
     if "courses" in data:
         raw_courses = data["courses"] or []
-        courses = []
-        for c in raw_courses:
-            try:
-                courses.append(CourseGrade.from_dict(c))
-            except (KeyError, ValueError) as e:
-                return jsonify({"success": False, "error": f"Invalid course entry: {e}"}), 400
+        courses, err = _parse_courses(raw_courses)
+        if err:
+            return jsonify({"success": False, "error": err}), 400
         fields["courses"] = courses
 
     if not fields:
@@ -230,7 +279,7 @@ def update_student(student_id):
         if not manager.save():
             # Roll back: restore the previous field values.
             manager.update_student(student_id, **old_fields)
-            return jsonify({"success": False, "error": "Update could not be saved. Please try again."}), 500
+            return jsonify({"success": False, "error": "Update could not be saved. Please try again."}), 503
         students = manager.get_all_students()
         idx = next((i for i, s in enumerate(students) if s.id == student.id), 0)
         return jsonify({"success": True, "student": student_to_payload(student, idx)})
@@ -250,8 +299,8 @@ def delete_student(student_id):
         student = manager.remove_student(index)
         if not manager.save():
             # Roll back: re-insert the student at the original index.
-            manager._students.insert(index, student)
-            return jsonify({"success": False, "error": "Deletion could not be saved. Please try again."}), 500
+            manager.insert_student_at(index, student)
+            return jsonify({"success": False, "error": "Deletion could not be saved. Please try again."}), 503
         return jsonify({
             "success": True,
             "student": {"name": student.name, "grade": student.grade}
@@ -287,7 +336,7 @@ def add_student_to_group(student_id):
         student = manager.assign_group(student_id, group)
         if not manager.save():
             manager.remove_from_group(student_id, group)
-            return jsonify({"success": False, "error": "Could not save group assignment."}), 500
+            return jsonify({"success": False, "error": "Could not save group assignment."}), 503
         students = manager.get_all_students()
         idx = next((i for i, s in enumerate(students) if s.id == student.id), 0)
         return jsonify({"success": True, "student": student_to_payload(student, idx)})
@@ -302,7 +351,7 @@ def remove_student_from_group(student_id, group_name):
         student = manager.remove_from_group(student_id, group_name)
         if not manager.save():
             manager.assign_group(student_id, group_name)
-            return jsonify({"success": False, "error": "Could not save group removal."}), 500
+            return jsonify({"success": False, "error": "Could not save group removal."}), 503
         students = manager.get_all_students()
         idx = next((i for i, s in enumerate(students) if s.id == student.id), 0)
         return jsonify({"success": True, "student": student_to_payload(student, idx)})
@@ -458,7 +507,7 @@ def sort_students():
     payload = [student_to_payload(s, i) for i, s in enumerate(students)]
     if not saved:
         # Sort succeeded in memory; warn the client that the order was not persisted.
-        return jsonify({"success": False, "error": "Sort order could not be saved.", "students": payload}), 500
+        return jsonify({"success": False, "error": "Sort order could not be saved.", "students": payload}), 503
     return jsonify(payload)
 
 
@@ -466,7 +515,9 @@ def sort_students():
 def save_data():
     """Save data to the persistence layer."""
     success = manager.save()
-    return jsonify({"success": success})
+    if not success:
+        return jsonify({"success": False, "error": "Could not save data. Please try again."}), 503
+    return jsonify({"success": True})
 
 
 # ---------------------------------------------------------------------------
