@@ -13,6 +13,13 @@ const API = {
     insights:          '/api/insights',
     deadlines:         '/api/deadlines',
     deadlinesUpcoming: '/api/deadlines/upcoming',
+    pgTest:            '/api/pg/test',
+    pgConnect:         '/api/pg/connect',
+    classes:           '/api/classes',
+    enrollments:       '/api/enrollments',
+    seed:              '/api/seed',
+    seedClasses:       '/api/seed/classes',
+    seedDeadlines:     '/api/seed/deadlines',
 };
 
 // Grade bounds — updated from /api/config on load; defaults match config.py.
@@ -119,6 +126,7 @@ function initNav() {
             // Lazy-load analytics when the tab becomes visible
             if (tab === 'analytics') renderAnalyticsCharts();
             if (tab === 'deadlines') loadDeadlines();
+            if (tab === 'classes')   loadClasses();
         });
     });
 
@@ -997,6 +1005,131 @@ async function saveDatabase() {
 }
 
 /* ==========================================================================
+   GENERATE STUDENTS (SEED MODAL)
+   ========================================================================== */
+function openSeedModal() {
+    const modal = document.getElementById('seed-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    document.getElementById('seed-n')?.focus();
+}
+
+function closeSeedModal() {
+    document.getElementById('seed-modal')?.classList.add('hidden');
+}
+
+async function submitSeed(e) {
+    e.preventDefault();
+    const n       = parseInt(document.getElementById('seed-n')?.value || '10', 10);
+    const clear   = document.getElementById('seed-clear')?.checked ?? false;
+    const btn     = document.getElementById('seed-submit-btn');
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+    try {
+        const res  = await fetch(API.seed, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ n, clear }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            showToast(data.error || 'Seed failed.', 'error');
+        } else {
+            showToast(`✅ Generated ${data.added} student${data.added !== 1 ? 's' : ''}.`, 'success');
+            closeSeedModal();
+            loadStudents();
+            loadStats();
+            loadInsights();
+        }
+    } catch (_) {
+        showToast('Network error. Could not generate students.', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate'; }
+    }
+}
+
+/* ==========================================================================
+   GENERATE CLASSES (SEED MODAL)
+   ========================================================================== */
+function openSeedClassesModal() {
+    document.getElementById('seed-classes-modal')?.classList.remove('hidden');
+    document.getElementById('seed-classes-n')?.focus();
+}
+
+function closeSeedClassesModal() {
+    document.getElementById('seed-classes-modal')?.classList.add('hidden');
+}
+
+async function submitSeedClasses(e) {
+    e.preventDefault();
+    const n     = parseInt(document.getElementById('seed-classes-n')?.value || '10', 10);
+    const clear = document.getElementById('seed-classes-clear')?.checked ?? false;
+    const btn   = document.getElementById('seed-classes-submit-btn');
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+    try {
+        const res  = await fetch(API.seedClasses, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ n, clear }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            showToast(data.error || 'Seed failed.', 'error');
+        } else {
+            showToast(`✅ Generated ${data.added} class${data.added !== 1 ? 'es' : ''}.`, 'success');
+            closeSeedClassesModal();
+            loadClasses();
+        }
+    } catch (_) {
+        showToast('Network error. Could not generate classes.', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate'; }
+    }
+}
+
+/* ==========================================================================
+   GENERATE DEADLINES (SEED MODAL)
+   ========================================================================== */
+function openSeedDeadlinesModal() {
+    document.getElementById('seed-deadlines-modal')?.classList.remove('hidden');
+    document.getElementById('seed-deadlines-n')?.focus();
+}
+
+function closeSeedDeadlinesModal() {
+    document.getElementById('seed-deadlines-modal')?.classList.add('hidden');
+}
+
+async function submitSeedDeadlines(e) {
+    e.preventDefault();
+    const n     = parseInt(document.getElementById('seed-deadlines-n')?.value || '10', 10);
+    const clear = document.getElementById('seed-deadlines-clear')?.checked ?? false;
+    const btn   = document.getElementById('seed-deadlines-submit-btn');
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+    try {
+        const res  = await fetch(API.seedDeadlines, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ n, clear }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            showToast(data.error || 'Seed failed.', 'error');
+        } else {
+            showToast(`✅ Generated ${data.added} deadline${data.added !== 1 ? 's' : ''}.`, 'success');
+            closeSeedDeadlinesModal();
+            loadDeadlines();
+            loadDeadlineReminders();
+        }
+    } catch (_) {
+        showToast('Network error. Could not generate deadlines.', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate'; }
+    }
+}
+
+/* ==========================================================================
    CONFIG LOAD
    ========================================================================== */
 async function loadConfig() {
@@ -1007,7 +1140,107 @@ async function loadConfig() {
         if (typeof cfg.min_grade        === 'number') minGrade         = cfg.min_grade;
         if (typeof cfg.max_grade        === 'number') maxGrade         = cfg.max_grade;
         if (typeof cfg.passing_threshold === 'number') passingThreshold = cfg.passing_threshold;
+        // Reveal the PostgreSQL nav item only when local_demo mode is enabled server-side
+        if (cfg.local_demo === true) {
+            document.getElementById('nav-pg-settings')?.classList.remove('hidden');
+        }
     } catch (_) { /* retain defaults */ }
+}
+
+/* ==========================================================================
+   POSTGRESQL CONNECTION MODAL (A5)
+   ========================================================================== */
+function openPgModal() {
+    const modal = document.getElementById('pg-modal');
+    if (!modal) return;
+    // Clear any previous status
+    const msg = document.getElementById('pg-status-msg');
+    if (msg) { msg.textContent = ''; msg.className = 'pg-status-msg hidden'; }
+    modal.classList.remove('hidden');
+}
+
+function closePgModal() {
+    document.getElementById('pg-modal')?.classList.add('hidden');
+}
+
+function _pgSetStatus(text, ok) {
+    const msg = document.getElementById('pg-status-msg');
+    if (!msg) return;
+    msg.textContent = text;
+    msg.className = `pg-status-msg ${ok ? 'pg-ok' : 'pg-err'}`;
+}
+
+function _pgGetUrl() {
+    return (document.getElementById('pg-url-input')?.value || '').trim();
+}
+
+async function pgTestConnection() {
+    const url = _pgGetUrl();
+    if (!url) { _pgSetStatus('Enter a PostgreSQL URL first.', false); return; }
+    _pgSetStatus('Testing…', true);
+    try {
+        const res = await fetch(API.pgTest, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            _pgSetStatus('✓ Connection successful.', true);
+        } else {
+            _pgSetStatus('✗ ' + (data.error || 'Connection failed.'), false);
+        }
+    } catch (_) {
+        _pgSetStatus('✗ Network error.', false);
+    }
+}
+
+async function pgConnect() {
+    const url = _pgGetUrl();
+    if (!url) { _pgSetStatus('Enter a PostgreSQL URL first.', false); return; }
+    _pgSetStatus('Connecting…', true);
+    try {
+        const res = await fetch(API.pgConnect, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            _pgSetStatus('✓ Switched to PostgreSQL backend.', true);
+            showToast('Connected to PostgreSQL.', 'success');
+            // Reload student data from the new backend
+            loadStudents();
+            setTimeout(closePgModal, 1200);
+        } else {
+            _pgSetStatus('✗ ' + (data.error || 'Connection failed.'), false);
+        }
+    } catch (_) {
+        _pgSetStatus('✗ Network error.', false);
+    }
+}
+
+function initPgModal() {
+    document.getElementById('nav-pg-settings')?.addEventListener('click', openPgModal);
+    document.getElementById('pg-modal-close')?.addEventListener('click', closePgModal);
+    document.getElementById('pg-cancel-btn')?.addEventListener('click', closePgModal);
+    document.getElementById('pg-modal')?.addEventListener('click', e => {
+        if (e.target.id === 'pg-modal') closePgModal();
+    });
+    document.getElementById('pg-test-btn')?.addEventListener('click', pgTestConnection);
+    document.getElementById('pg-connect-btn')?.addEventListener('click', pgConnect);
+
+    // Mask / reveal toggle (eye icon)
+    const toggle = document.getElementById('pg-url-toggle');
+    const input  = document.getElementById('pg-url-input');
+    const icon   = document.getElementById('pg-eye-icon');
+    if (toggle && input && icon) {
+        toggle.addEventListener('click', () => {
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            icon.className = isPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+        });
+    }
 }
 
 /* ==========================================================================
@@ -1104,6 +1337,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-save-db')?.addEventListener('click', saveDatabase);
     document.getElementById('btn-save-db-mobile')?.addEventListener('click', saveDatabase);
 
+    // ── Generate students ─────────────────────────────────────────────────
+    document.getElementById('btn-generate-students')?.addEventListener('click', openSeedModal);
+    document.getElementById('seed-modal-close')?.addEventListener('click', closeSeedModal);
+    document.getElementById('seed-cancel-btn')?.addEventListener('click', closeSeedModal);
+    document.getElementById('seed-modal')?.addEventListener('click', e => { if (e.target.id === 'seed-modal') closeSeedModal(); });
+    document.getElementById('seed-form')?.addEventListener('submit', submitSeed);
+
+    // ── Generate classes ──────────────────────────────────────────────────
+    document.getElementById('btn-generate-classes')?.addEventListener('click', openSeedClassesModal);
+    document.getElementById('seed-classes-modal-close')?.addEventListener('click', closeSeedClassesModal);
+    document.getElementById('seed-classes-cancel-btn')?.addEventListener('click', closeSeedClassesModal);
+    document.getElementById('seed-classes-modal')?.addEventListener('click', e => { if (e.target.id === 'seed-classes-modal') closeSeedClassesModal(); });
+    document.getElementById('seed-classes-form')?.addEventListener('submit', submitSeedClasses);
+
+    // ── Generate deadlines ────────────────────────────────────────────────
+    document.getElementById('btn-generate-deadlines')?.addEventListener('click', openSeedDeadlinesModal);
+    document.getElementById('seed-deadlines-modal-close')?.addEventListener('click', closeSeedDeadlinesModal);
+    document.getElementById('seed-deadlines-cancel-btn')?.addEventListener('click', closeSeedDeadlinesModal);
+    document.getElementById('seed-deadlines-modal')?.addEventListener('click', e => { if (e.target.id === 'seed-deadlines-modal') closeSeedDeadlinesModal(); });
+    document.getElementById('seed-deadlines-form')?.addEventListener('submit', submitSeedDeadlines);
+
     // ── Analytics refresh ─────────────────────────────────────────────────
     document.getElementById('btn-refresh-analytics')?.addEventListener('click', () => {
         window._lastStats = null;
@@ -1117,12 +1371,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('deadline-modal')?.addEventListener('click', e => { if (e.target.id === 'deadline-modal') closeDeadlineModal(); });
     document.getElementById('deadline-form')?.addEventListener('submit', submitDeadlineForm);
 
-    // Escape key — also close deadline modal
+    // Escape key — also close deadline modal and pg modal
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && !document.getElementById('deadline-modal')?.classList.contains('hidden')) {
-            closeDeadlineModal();
+        if (e.key === 'Escape') {
+            if (!document.getElementById('deadline-modal')?.classList.contains('hidden')) {
+                closeDeadlineModal();
+            }
+            if (!document.getElementById('pg-modal')?.classList.contains('hidden')) {
+                closePgModal();
+            }
         }
     }, true);
+
+    // ── PostgreSQL modal ──────────────────────────────────────────────────
+    initPgModal();
+
+    // ── Class modal ───────────────────────────────────────────────────────
+    document.getElementById('btn-open-class-modal')?.addEventListener('click', () => openClassModal());
+    document.getElementById('class-modal-close')?.addEventListener('click', closeClassModal);
+    document.getElementById('class-cancel-btn')?.addEventListener('click', closeClassModal);
+    document.getElementById('class-modal')?.addEventListener('click', e => { if (e.target.id === 'class-modal') closeClassModal(); });
+    document.getElementById('class-form')?.addEventListener('submit', submitClassForm);
 
     // ── Initial load ──────────────────────────────────────────────────────
     loadConfig().then(() => {
@@ -1396,5 +1665,292 @@ async function deleteDeadline(id, title) {
         }
     } catch (_) {
         showToast('Network error. Could not delete deadline.', 'error');
+    }
+}
+
+/* ==========================================================================
+   CLASSES TAB
+   ========================================================================== */
+
+// Currently selected class UUID; '' = all students
+let _selectedClassId = '';
+
+function formatIsoDate(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m,10)-1]} ${parseInt(d,10)}, ${y}`;
+}
+
+async function loadClasses() {
+    try {
+        const res = await fetch(API.classes);
+        if (!res.ok) { showToast(`Server error (${res.status}).`, 'error'); return; }
+        const classes = await res.json();
+        renderClassesTable(classes);
+        renderClassChips(classes);
+    } catch (_) {
+        showToast('Failed to load classes.', 'error');
+    }
+}
+
+function renderClassChips(classes) {
+    const list = document.getElementById('class-chips-list');
+    if (!list) return;
+    list.innerHTML = '';
+    classes.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'class-chip' + (_selectedClassId === c.id ? ' active' : '');
+        btn.dataset.classId = c.id;
+        btn.innerHTML = `<i class="fa-solid fa-chalkboard-user"></i> ${escapeHtml(c.code)} — ${escapeHtml(c.title)}`;
+        btn.addEventListener('click', () => selectClass(c.id, c.code, c.title));
+        list.appendChild(btn);
+    });
+}
+
+function renderClassesTable(classes) {
+    const tbody = document.getElementById('classes-table-body');
+    const empty = document.getElementById('classes-empty-state');
+    const card  = document.getElementById('classes-table-card');
+    const sub   = document.getElementById('classes-subtitle');
+    if (!tbody) return;
+
+    if (!classes || classes.length === 0) {
+        tbody.innerHTML = '';
+        if (empty) empty.classList.remove('hidden');
+        if (card)  card.classList.add('hidden');
+        if (sub)   sub.textContent = '0 classes';
+        return;
+    }
+    if (empty) empty.classList.add('hidden');
+    if (card)  card.classList.remove('hidden');
+    if (sub)   sub.textContent = `${classes.length} class${classes.length !== 1 ? 'es' : ''}`;
+
+    tbody.innerHTML = '';
+    classes.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.dataset.classId = c.id;
+        tr.innerHTML = `
+            <td><strong style="color:var(--primary);">${escapeHtml(c.code)}</strong></td>
+            <td>${escapeHtml(c.title)}</td>
+            <td style="color:var(--text-muted);font-size:0.875rem;">${c.credits}</td>
+            <td style="color:var(--text-muted);font-size:0.875rem;">${formatIsoDate(c.term_start)}</td>
+            <td style="color:var(--text-muted);font-size:0.875rem;">${formatIsoDate(c.term_end)}</td>
+            <td><span class="result-badge">${c.student_count}</span></td>
+            <td class="text-right">
+                <div class="actions-cell">
+                    <button class="btn-action btn-action-view"   title="View Roster"><i class="fa-solid fa-users"></i></button>
+                    <button class="btn-action btn-action-edit"   title="Edit Class"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn-action btn-action-delete" title="Delete Class"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            </td>`;
+        tr.querySelector('.btn-action-view').addEventListener('click',   () => selectClass(c.id, c.code, c.title));
+        tr.querySelector('.btn-action-edit').addEventListener('click',   () => openClassModal(c));
+        tr.querySelector('.btn-action-delete').addEventListener('click', () => deleteClass(c.id, c.code));
+        tbody.appendChild(tr);
+    });
+}
+
+/* -- Class selector -- */
+
+function selectClass(classId, code, title) {
+    _selectedClassId = classId;
+
+    // Update chip states
+    document.querySelectorAll('.class-chip').forEach(b => {
+        b.classList.toggle('active', b.dataset.classId === classId);
+    });
+
+    // Show enrollment panel
+    const panel = document.getElementById('enrollment-panel');
+    const ptitle = document.getElementById('enrollment-panel-title');
+    if (panel) panel.classList.remove('hidden');
+    if (ptitle) ptitle.innerHTML = `<i class="fa-solid fa-user-group" style="color:var(--primary);"></i> ${escapeHtml(code)} — ${escapeHtml(title)}`;
+
+    loadClassRoster(classId);
+}
+
+async function loadClassRoster(classId) {
+    try {
+        const res = await fetch(`${API.classes}/${classId}/students`);
+        if (!res.ok) { showToast('Failed to load roster.', 'error'); return; }
+        const enrolled = await res.json();
+
+        // Also need the full student list for the "enroll" toggles
+        const allRes = await fetch(API.students);
+        if (!allRes.ok) return;
+        const allStudents = await allRes.json();
+
+        renderEnrollmentPanel(classId, allStudents, enrolled);
+    } catch (_) {
+        showToast('Failed to load class roster.', 'error');
+    }
+}
+
+function renderEnrollmentPanel(classId, allStudents, enrolledStudents) {
+    const list  = document.getElementById('enrollment-all-students-list');
+    const badge = document.getElementById('enrollment-count-badge');
+    if (!list) return;
+
+    const enrolledIds = new Set(enrolledStudents.map(s => s.student_id));
+    if (badge) badge.textContent = `${enrolledIds.size} enrolled`;
+
+    list.innerHTML = '';
+    if (allStudents.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-muted);font-size:0.875rem;padding:0.5rem 0;">No students in the system yet.</p>';
+        return;
+    }
+
+    allStudents.forEach(s => {
+        const isEnrolled = enrolledIds.has(s.student_id);
+        const row = document.createElement('div');
+        row.className = 'enrollment-student-row';
+        row.dataset.studentId = s.student_id;
+        row.innerHTML = `
+            <div class="enrollment-student-info">
+                <span class="enrollment-student-name">${escapeHtml(s.name)}</span>
+                ${s.email ? `<span class="enrollment-student-email">${escapeHtml(s.email)}</span>` : ''}
+            </div>
+            <button class="btn btn-sm ${isEnrolled ? 'btn-danger enrollment-unenroll-btn' : 'btn-primary enrollment-enroll-btn'}"
+                    data-student-id="${escapeHtml(s.student_id)}"
+                    data-class-id="${escapeHtml(classId)}">
+                ${isEnrolled ? '<i class="fa-solid fa-user-minus"></i> Remove' : '<i class="fa-solid fa-user-plus"></i> Enroll'}
+            </button>`;
+
+        row.querySelector('button').addEventListener('click', async (e) => {
+            e.preventDefault();
+            const sid = s.student_id;
+            const cid = classId;
+            const wasEnrolled = enrolledIds.has(sid);
+
+            try {
+                const res = await fetch(API.enrollments, {
+                    method: wasEnrolled ? 'DELETE' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: sid, class_id: cid }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(wasEnrolled ? '↩ Student removed from class.' : '✅ Student enrolled.', 'success');
+                    // Refresh without a full reload to avoid stale data
+                    await loadClassRoster(cid);
+                    // Also refresh chips (student_count may have changed)
+                    loadClasses();
+                } else {
+                    showToast(data.error || 'Could not update enrollment.', 'error');
+                }
+            } catch (_) {
+                showToast('Network error.', 'error');
+            }
+        });
+
+        list.appendChild(row);
+    });
+}
+
+/* -- All-students selector -- */
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-all-students')?.addEventListener('click', () => {
+        _selectedClassId = '';
+        document.querySelectorAll('.class-chip').forEach(b => {
+            b.classList.toggle('active', b.dataset.classId === '');
+        });
+        const panel = document.getElementById('enrollment-panel');
+        if (panel) panel.classList.add('hidden');
+    });
+});
+
+/* -- Class modal (create / edit) -- */
+
+function openClassModal(cls = null) {
+    const modal     = document.getElementById('class-modal');
+    const titleEl   = document.getElementById('class-modal-title');
+    const submitBtn = document.getElementById('class-submit-btn');
+    const editId    = document.getElementById('class-edit-id');
+    if (!modal) return;
+
+    document.getElementById('class-code').value        = cls ? cls.code  : '';
+    document.getElementById('class-title').value       = cls ? cls.title : '';
+    document.getElementById('class-credits').value     = cls ? cls.credits : '3';
+    document.getElementById('class-term-start').value  = cls ? (cls.term_start || '') : '';
+    document.getElementById('class-term-end').value    = cls ? (cls.term_end   || '') : '';
+    editId.value = cls ? cls.id : '';
+
+    if (cls) {
+        titleEl.innerHTML  = '<i class="fa-solid fa-pen-to-square"></i> Edit Class';
+        submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    } else {
+        titleEl.innerHTML  = '<i class="fa-solid fa-plus"></i> New Class';
+        submitBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Create Class';
+    }
+
+    modal.classList.remove('hidden');
+    setTimeout(() => document.getElementById('class-code')?.focus(), 60);
+}
+
+function closeClassModal() {
+    document.getElementById('class-modal')?.classList.add('hidden');
+}
+
+async function submitClassForm(e) {
+    e.preventDefault();
+    const editId  = document.getElementById('class-edit-id')?.value;
+    const code    = (document.getElementById('class-code')?.value || '').trim();
+    const title   = (document.getElementById('class-title')?.value || '').trim();
+    const credits = parseFloat(document.getElementById('class-credits')?.value || '3');
+    const termStart = document.getElementById('class-term-start')?.value || null;
+    const termEnd   = document.getElementById('class-term-end')?.value   || null;
+
+    if (!code)  { showToast('Course code is required.', 'error'); return; }
+    if (!title) { showToast('Title is required.', 'error'); return; }
+
+    const payload = { code, title, credits };
+    if (termStart) payload.term_start = termStart;
+    if (termEnd)   payload.term_end   = termEnd;
+
+    const isEdit = !!editId;
+    const url    = isEdit ? `${API.classes}/${editId}` : API.classes;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload),
+        });
+        if (!res.ok) { showToast(`Server error (${res.status}).`, 'error'); return; }
+        const data = await res.json();
+        if (data.success) {
+            showToast(isEdit ? '✏️ Class updated.' : '✅ Class created.', 'success');
+            closeClassModal();
+            loadClasses();
+        } else {
+            showToast(data.error || 'Failed to save class.', 'error');
+        }
+    } catch (_) {
+        showToast('Network error. Could not save class.', 'error');
+    }
+}
+
+async function deleteClass(id, code) {
+    if (!confirm(`Delete class "${code}"? All enrollments will be removed first.`)) return;
+    try {
+        const res = await fetch(`${API.classes}/${id}`, { method: 'DELETE' });
+        if (!res.ok) { showToast(`Server error (${res.status}).`, 'error'); return; }
+        const data = await res.json();
+        if (data.success) {
+            showToast('🗑️ Class removed.', 'success');
+            if (_selectedClassId === id) {
+                _selectedClassId = '';
+                const panel = document.getElementById('enrollment-panel');
+                if (panel) panel.classList.add('hidden');
+            }
+            loadClasses();
+        } else {
+            showToast(data.error || 'Failed to delete class.', 'error');
+        }
+    } catch (_) {
+        showToast('Network error. Could not delete class.', 'error');
     }
 }

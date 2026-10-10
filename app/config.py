@@ -7,6 +7,12 @@ changing a limit or path only requires editing one file.
 
 import os
 
+# ── Local-demo mode ──────────────────────────────────────────────────────
+# Set LOCAL_DEMO=1 in the environment to enable the PostgreSQL connection UI.
+# This mode is intended for loopback-bound development only (localhost).
+# The routes are disabled on external binding regardless of this flag.
+LOCAL_DEMO_MODE: bool = os.environ.get("LOCAL_DEMO", "").strip() == "1"
+
 # ── Grade Boundaries ─────────────────────────────────────────────────────
 MIN_GRADE: int = 0
 MAX_GRADE: int = 100

@@ -1357,3 +1357,153 @@ textarea:focus {
 .badge-type-exam       { background: rgba(248,113,113,.15); color: #f87171; }
 .badge-type-project    { background: rgba(56,189,248,.15);  color: #38bdf8; }
 .badge-type-other      { background: rgba(161,161,181,.12); color: var(--text-muted); }
+
+/* ==========================================================================
+   POSTGRESQL CONNECTION MODAL (A5)
+   ========================================================================== */
+.pg-url-wrapper {
+    position: relative;
+}
+
+.pg-url-wrapper input[type="password"],
+.pg-url-wrapper input[type="text"] {
+    padding-right: 2.8rem;   /* room for the eye toggle */
+}
+
+.btn-pg-eye {
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0.25rem;
+    line-height: 1;
+    transition: color 0.18s;
+}
+.btn-pg-eye:hover { color: var(--primary); }
+
+.pg-status-msg {
+    padding: 0.55rem 0.9rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+}
+.pg-status-msg.pg-ok {
+    background: var(--success-bg);
+    color: var(--success);
+    border: 1px solid rgba(52, 211, 153, 0.25);
+}
+.pg-status-msg.pg-err {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+/* ==========================================================================
+   CLASSES TAB — class chips, enrollment panel (A6)
+   ========================================================================== */
+
+/* Class selector bar */
+.class-selector-bar {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.class-selector-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.class-chips-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.class-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.class-chip:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.class-chip.active {
+    background: var(--primary-dark);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+/* Enrollment panel */
+.enrollment-panel {
+    margin-top: 1rem;
+}
+
+.enrollment-students-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+.enrollment-student-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius-md);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-color);
+    transition: var(--transition-base);
+}
+
+.enrollment-student-row:hover {
+    border-color: var(--border-highlight);
+    background: rgba(167,139,250,0.05);
+}
+
+.enrollment-student-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.enrollment-student-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.enrollment-student-email {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+

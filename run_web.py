@@ -1,4 +1,5 @@
 import os
+import random
 from datetime import date, datetime
 from flask import Flask, jsonify, request, render_template
 from app.validators.input_validator import InputValidator as _IV
@@ -6,11 +7,13 @@ from app.validators.input_validator import InputValidator as _IV
 from app.storage.sqlite_storage import SqliteStorage
 from app.storage.deadline_storage import DeadlineStorage
 from app.services.student_manager import StudentManager
+from app.services.class_manager import ClassManager
 from app.services.statistics_service import StatisticsService
 from app.services.insights_service import InsightsService
 from app.models.student import Student, CourseGrade
+from app.models.class_record import ClassRecord
 from app.models.deadline import Deadline
-from app.config import MIN_GRADE, MAX_GRADE, PASSING_THRESHOLD, DEFAULT_DB_FILE
+from app.config import MIN_GRADE, MAX_GRADE, PASSING_THRESHOLD, DEFAULT_DB_FILE, LOCAL_DEMO_MODE
 
 # Set directories relative to this file
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'app', 'templates'))
@@ -21,7 +24,28 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 # Initialize Storage & StudentManager
 storage = SqliteStorage(DEFAULT_DB_FILE)
 manager = StudentManager(storage)
-manager.load()
+
+# Initialize ClassManager and load full dataset
+class_manager = ClassManager()
+_dataset = storage.load_dataset()
+with manager._lock:
+    manager._students = _dataset.students
+class_manager.load_from_data(_dataset.classes, _dataset.enrollments)
+
+
+def _save_dataset() -> bool:
+    """Persist students + classes + enrollments atomically.
+
+    Delegates to manager._storage so that test-injected backends are respected.
+    """
+    with manager._lock:
+        snapshot = list(manager._students)
+    return manager._storage.save_dataset(
+        students=snapshot,
+        classes=class_manager.classes_to_list(),
+        enrollments=class_manager.enrollments_to_list(),
+    )
+
 
 # Initialize Deadline Storage
 deadline_storage = DeadlineStorage()
@@ -70,6 +94,7 @@ def get_config():
         "min_grade": MIN_GRADE,
         "max_grade": MAX_GRADE,
         "passing_threshold": PASSING_THRESHOLD,
+        "local_demo": LOCAL_DEMO_MODE,
     })
 
 
@@ -181,7 +206,7 @@ def add_student():
             department=data.get("department", ""),
             groups=groups,
         )
-        if not manager.save():
+        if not _save_dataset():
             # Roll back: remove the student that was just added in memory.
             all_students = manager.get_all_students()
             rollback_idx = next((i for i, s in enumerate(all_students) if s.id == student.id), None)
@@ -276,7 +301,7 @@ def update_student(student_id):
 
     try:
         student = manager.update_student(student_id, **fields)
-        if not manager.save():
+        if not _save_dataset():
             # Roll back: restore the previous field values.
             manager.update_student(student_id, **old_fields)
             return jsonify({"success": False, "error": "Update could not be saved. Please try again."}), 503
@@ -297,7 +322,7 @@ def delete_student(student_id):
 
     try:
         student = manager.remove_student(index)
-        if not manager.save():
+        if not _save_dataset():
             # Roll back: re-insert the student at the original index.
             manager.insert_student_at(index, student)
             return jsonify({"success": False, "error": "Deletion could not be saved. Please try again."}), 503
@@ -334,7 +359,7 @@ def add_student_to_group(student_id):
         return jsonify({"success": False, "error": "group is required."}), 400
     try:
         student = manager.assign_group(student_id, group)
-        if not manager.save():
+        if not _save_dataset():
             manager.remove_from_group(student_id, group)
             return jsonify({"success": False, "error": "Could not save group assignment."}), 503
         students = manager.get_all_students()
@@ -349,7 +374,7 @@ def remove_student_from_group(student_id, group_name):
     """Remove a student from a group."""
     try:
         student = manager.remove_from_group(student_id, group_name)
-        if not manager.save():
+        if not _save_dataset():
             manager.assign_group(student_id, group_name)
             return jsonify({"success": False, "error": "Could not save group removal."}), 503
         students = manager.get_all_students()
@@ -502,7 +527,7 @@ def sort_students():
     """Sort students by grade in-place and return the sorted list."""
     ascending = request.args.get("ascending", "true").lower() == "true"
     manager.sort_by_grade(ascending)
-    saved = manager.save()
+    saved = _save_dataset()
     students = manager.get_all_students()
     payload = [student_to_payload(s, i) for i, s in enumerate(students)]
     if not saved:
@@ -514,10 +539,249 @@ def sort_students():
 @app.route('/api/save', methods=['POST'])
 def save_data():
     """Save data to the persistence layer."""
-    success = manager.save()
+    success = _save_dataset()
     if not success:
         return jsonify({"success": False, "error": "Could not save data. Please try again."}), 503
     return jsonify({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Classes — CRUD
+# ---------------------------------------------------------------------------
+
+def _class_payload(c: ClassRecord) -> dict:
+    """Serialise a ClassRecord to the JSON shape sent to the frontend."""
+    return {
+        "id":         c.id,
+        "code":       c.code,
+        "title":      c.title,
+        "credits":    c.credits,
+        "term_start": c.term_start.isoformat() if c.term_start else None,
+        "term_end":   c.term_end.isoformat() if c.term_end else None,
+        "student_count": len(class_manager.get_students_in_class(c.id)),
+    }
+
+
+@app.route('/api/classes', methods=['GET'])
+def get_classes():
+    """Return all classes."""
+    return jsonify([_class_payload(c) for c in class_manager.get_all_classes()])
+
+
+@app.route('/api/classes', methods=['POST'])
+def add_class():
+    """Create a new class."""
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
+    code_raw  = data.get("code")
+    title_raw = data.get("title")
+    if not isinstance(code_raw, str) or not code_raw.strip():
+        return jsonify({"success": False, "error": "code must be a nonempty string."}), 400
+    if not isinstance(title_raw, str) or not title_raw.strip():
+        return jsonify({"success": False, "error": "title must be a nonempty string."}), 400
+
+    credits_raw = data.get("credits", 3.0)
+    if isinstance(credits_raw, bool):
+        return jsonify({"success": False, "error": "credits must be a number."}), 400
+    try:
+        credits_val = float(credits_raw)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "credits must be a number."}), 400
+
+    # Optional dates
+    from datetime import date as _date
+    def _parse_date(raw):
+        if not raw:
+            return None
+        try:
+            return _date.fromisoformat(raw)
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid date: {raw!r}")
+
+    try:
+        term_start = _parse_date(data.get("term_start"))
+        term_end   = _parse_date(data.get("term_end"))
+        record = class_manager.add_class(
+            code=code_raw.strip(),
+            title=title_raw.strip(),
+            credits=credits_val,
+            term_start=term_start,
+            term_end=term_end,
+        )
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    if not _save_dataset():
+        class_manager.delete_class(record.id)
+        return jsonify({"success": False, "error": "Class could not be saved. Please try again."}), 503
+
+    return jsonify({"success": True, "class": _class_payload(record)})
+
+
+@app.route('/api/classes/<class_id>', methods=['PUT'])
+def update_class(class_id):
+    """Update an existing class."""
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
+
+    record = class_manager.get_class(class_id)
+    if record is None:
+        return jsonify({"success": False, "error": "Class not found."}), 404
+
+    # Snapshot for rollback
+    old = record.to_dict()
+
+    fields = {}
+    for field in ("code", "title"):
+        if field in data:
+            val = data[field]
+            if not isinstance(val, str) or not val.strip():
+                return jsonify({"success": False, "error": f"{field} must be a nonempty string."}), 400
+            fields[field] = val.strip()
+
+    if "credits" in data:
+        cv = data["credits"]
+        if isinstance(cv, bool):
+            return jsonify({"success": False, "error": "credits must be a number."}), 400
+        try:
+            fields["credits"] = float(cv)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "credits must be a number."}), 400
+
+    from datetime import date as _date
+    for f in ("term_start", "term_end"):
+        if f in data:
+            raw = data[f]
+            if raw:
+                try:
+                    fields[f] = _date.fromisoformat(raw)
+                except (ValueError, TypeError):
+                    return jsonify({"success": False, "error": f"Invalid date for {f}."}), 400
+            else:
+                fields[f] = None
+
+    if not fields:
+        return jsonify({"success": False, "error": "No fields to update."}), 400
+
+    try:
+        updated = class_manager.update_class(class_id, **fields)
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    if not _save_dataset():
+        # Rollback
+        try:
+            from datetime import date as _date2
+            rb = {}
+            rb["code"] = old["code"]
+            rb["title"] = old["title"]
+            rb["credits"] = old["credits"]
+            rb["term_start"] = _date2.fromisoformat(old["term_start"]) if old.get("term_start") else None
+            rb["term_end"] = _date2.fromisoformat(old["term_end"]) if old.get("term_end") else None
+            class_manager.update_class(class_id, **rb)
+        except Exception:
+            pass
+        return jsonify({"success": False, "error": "Update could not be saved. Please try again."}), 503
+
+    return jsonify({"success": True, "class": _class_payload(updated)})
+
+
+@app.route('/api/classes/<class_id>', methods=['DELETE'])
+def delete_class(class_id):
+    """Delete a class (must have no enrolled students)."""
+    try:
+        record = class_manager.delete_class(class_id)
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    if not _save_dataset():
+        # Re-add the class on failure
+        try:
+            from app.models.class_record import ClassRecord as _CR
+            cr = _CR.from_dict(record.to_dict())
+            class_manager._classes[cr.id] = cr
+        except Exception:
+            pass
+        return jsonify({"success": False, "error": "Deletion could not be saved. Please try again."}), 503
+
+    return jsonify({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Enrollments
+# ---------------------------------------------------------------------------
+
+@app.route('/api/classes/<class_id>/students', methods=['GET'])
+def get_class_students(class_id):
+    """Return student UUIDs enrolled in a class."""
+    if class_manager.get_class(class_id) is None:
+        return jsonify({"success": False, "error": "Class not found."}), 404
+    student_ids = class_manager.get_students_in_class(class_id)
+    students = manager.get_all_students()
+    enrolled = [student_to_payload(s, i) for i, s in enumerate(students) if s.id in student_ids]
+    return jsonify(enrolled)
+
+
+@app.route('/api/enrollments', methods=['POST'])
+def enroll_student():
+    """Enroll a student in a class. Body: {"student_id": …, "class_id": …}"""
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
+    student_id = (data.get("student_id") or "").strip()
+    class_id   = (data.get("class_id")   or "").strip()
+    if not student_id:
+        return jsonify({"success": False, "error": "student_id is required."}), 400
+    if not class_id:
+        return jsonify({"success": False, "error": "class_id is required."}), 400
+    if manager.get_by_id(student_id) is None:
+        return jsonify({"success": False, "error": "Student not found."}), 404
+    try:
+        class_manager.enroll(student_id, class_id)
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    if not _save_dataset():
+        class_manager.unenroll(student_id, class_id)
+        return jsonify({"success": False, "error": "Enrollment could not be saved. Please try again."}), 503
+    return jsonify({"success": True, "enrolled": True})
+
+
+@app.route('/api/enrollments', methods=['DELETE'])
+def unenroll_student():
+    """Unenroll a student from a class. Body: {"student_id": …, "class_id": …}"""
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
+    student_id = (data.get("student_id") or "").strip()
+    class_id   = (data.get("class_id")   or "").strip()
+    if not student_id:
+        return jsonify({"success": False, "error": "student_id is required."}), 400
+    if not class_id:
+        return jsonify({"success": False, "error": "class_id is required."}), 400
+    try:
+        class_manager.unenroll(student_id, class_id)
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    if not _save_dataset():
+        try:
+            class_manager.enroll(student_id, class_id)
+        except Exception:
+            pass
+        return jsonify({"success": False, "error": "Unenrollment could not be saved. Please try again."}), 503
+    return jsonify({"success": True, "enrolled": False})
+
+
+@app.route('/api/students/<student_id>/classes', methods=['GET'])
+def get_student_classes(student_id):
+    """Return classes a student is enrolled in."""
+    if manager.get_by_id(student_id) is None:
+        return jsonify({"success": False, "error": "Student not found."}), 404
+    classes = class_manager.get_classes_for_student(student_id)
+    return jsonify([_class_payload(c) for c in classes])
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -654,6 +918,447 @@ def delete_deadline(deadline_id):
         _deadlines.insert(idx, removed)
         return jsonify({"success": False, "error": "Could not save deletion."}), 500
     return jsonify({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Seed — generate random students
+# ---------------------------------------------------------------------------
+
+_FIRST_NAMES = [
+    "Alice", "Bob", "Carlos", "Diana", "Ethan", "Fiona", "George", "Hannah",
+    "Ivan", "Julia", "Kevin", "Laura", "Marcus", "Nina", "Oscar", "Priya",
+    "Quinn", "Rachel", "Samuel", "Tara", "Umar", "Violet", "William", "Xena",
+    "Yusuf", "Zoe", "Aiden", "Bella", "Connor", "Daisy", "Eli", "Faith",
+    "Gabe", "Holly", "Iris", "Jack", "Kira", "Liam", "Maya", "Noah",
+    "Olivia", "Parker", "Ruby", "Sophia", "Tyler", "Uma", "Victor", "Wendy",
+]
+_LAST_NAMES = [
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller",
+    "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Wilson", "Anderson",
+    "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson",
+    "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker",
+    "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill",
+    "Flores", "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell",
+]
+_MAJORS = [
+    "Computer Science", "Mathematics", "Physics", "Engineering",
+    "Business Administration", "Psychology", "Biology", "Chemistry",
+    "Economics", "Political Science", "English Literature", "History",
+    "Nursing", "Architecture", "Philosophy",
+]
+_YEARS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
+_DEPARTMENTS = [
+    "Science & Technology", "Liberal Arts", "Business", "Health Sciences",
+    "Engineering", "Social Sciences",
+]
+_COURSE_POOL = [
+    "Calculus I", "Calculus II", "Linear Algebra", "Statistics",
+    "Intro to Programming", "Data Structures", "Algorithms", "Operating Systems",
+    "Databases", "Software Engineering", "Networking", "Machine Learning",
+    "Physics I", "Chemistry I", "Biology I", "English Composition",
+    "Technical Writing", "Ethics in Technology", "Economics 101", "Psychology 101",
+]
+
+
+@app.route('/api/seed', methods=['POST'])
+def seed_students():
+    """Generate n random students and add them to the roster.
+
+    Body (JSON, all optional):
+        n          int  Number of students to generate (1–100, default 10).
+        clear      bool If true, remove all existing students first.
+
+    Returns the list of newly added students.
+    """
+    data = request.json or {}
+
+    # --- n ---
+    n_raw = data.get("n", 10)
+    try:
+        n = int(n_raw)
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "n must be an integer."}), 400
+    if not (1 <= n <= 100):
+        return jsonify({"success": False, "error": "n must be between 1 and 100."}), 400
+
+    # --- clear ---
+    clear = bool(data.get("clear", False))
+    if clear:
+        existing = manager.get_all_students()
+        for i in range(len(existing) - 1, -1, -1):
+            manager.remove_student(i)
+
+    added = []
+    used_names: set[str] = set()
+    attempts = 0
+    while len(added) < n and attempts < n * 5:
+        attempts += 1
+        first = random.choice(_FIRST_NAMES)
+        last = random.choice(_LAST_NAMES)
+        name = f"{first} {last}"
+        if name in used_names:
+            continue
+        used_names.add(name)
+
+        grade = round(random.uniform(40, 100), 1)
+        major = random.choice(_MAJORS)
+        year = random.choice(_YEARS)
+        dept = random.choice(_DEPARTMENTS)
+        email = f"{first.lower()}.{last.lower()}{random.randint(10, 99)}@university.edu"
+
+        # 1–3 random courses
+        num_courses = random.randint(1, 3)
+        course_names = random.sample(_COURSE_POOL, min(num_courses, len(_COURSE_POOL)))
+        courses = [CourseGrade(course=c, grade=round(random.uniform(50, 100), 1)) for c in course_names]
+
+        try:
+            student = manager.add_student(
+                name=name,
+                grade=grade,
+                email=email,
+                major=major,
+                academic_year=year,
+                department=dept,
+                courses=courses,
+            )
+            added.append(student)
+        except ValueError:
+            pass  # name conflict or validation error — skip
+
+    if not _save_dataset():
+        return jsonify({"success": False, "error": "Students generated but could not be saved."}), 503
+
+    all_students = manager.get_all_students()
+    id_to_idx = {s.id: i for i, s in enumerate(all_students)}
+    return jsonify({
+        "success": True,
+        "added": len(added),
+        "students": [student_to_payload(s, id_to_idx[s.id]) for s in added],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Seed — generate random classes
+# ---------------------------------------------------------------------------
+
+_CLASS_TEMPLATES = [
+    ("CS101", "Introduction to Computer Science"),
+    ("CS201", "Data Structures & Algorithms"),
+    ("CS301", "Operating Systems"),
+    ("CS401", "Software Engineering"),
+    ("CS450", "Machine Learning"),
+    ("CS460", "Computer Networks"),
+    ("CS470", "Database Systems"),
+    ("CS480", "Compiler Design"),
+    ("MATH101", "Calculus I"),
+    ("MATH102", "Calculus II"),
+    ("MATH201", "Linear Algebra"),
+    ("MATH301", "Probability & Statistics"),
+    ("MATH401", "Discrete Mathematics"),
+    ("PHYS101", "Physics I: Mechanics"),
+    ("PHYS102", "Physics II: Electromagnetism"),
+    ("CHEM101", "General Chemistry I"),
+    ("CHEM201", "Organic Chemistry"),
+    ("BIO101", "Introduction to Biology"),
+    ("BIO301", "Genetics"),
+    ("ENG101", "English Composition"),
+    ("ENG201", "Technical Writing"),
+    ("ENG301", "Literature & Society"),
+    ("BUS101", "Introduction to Business"),
+    ("BUS201", "Marketing Principles"),
+    ("BUS301", "Financial Accounting"),
+    ("BUS401", "Strategic Management"),
+    ("ECON101", "Microeconomics"),
+    ("ECON201", "Macroeconomics"),
+    ("PSY101", "Introduction to Psychology"),
+    ("PSY301", "Developmental Psychology"),
+    ("SOC101", "Introduction to Sociology"),
+    ("HIST101", "World History I"),
+    ("HIST201", "American History"),
+    ("PHIL101", "Introduction to Philosophy"),
+    ("PHIL201", "Ethics"),
+    ("ARCH101", "Architectural Design I"),
+    ("ARCH201", "Structural Systems"),
+    ("NUR101", "Foundations of Nursing"),
+    ("NUR301", "Pharmacology"),
+    ("ENVS101", "Environmental Science"),
+    ("ENVS201", "Climate & Sustainability"),
+    ("POLS101", "Introduction to Political Science"),
+    ("POLS301", "International Relations"),
+    ("STAT201", "Applied Statistics"),
+    ("AI301", "Artificial Intelligence"),
+    ("CYB201", "Cybersecurity Fundamentals"),
+    ("WEB201", "Web Development"),
+    ("PROJ401", "Capstone Project"),
+    ("SEMINAR", "Research Methods Seminar"),
+    ("ELEC101", "Electrical Engineering Basics"),
+]
+_CREDIT_OPTIONS = [1.0, 2.0, 3.0, 3.0, 3.0, 4.0]  # weighted toward 3 credits
+
+
+@app.route('/api/seed/classes', methods=['POST'])
+def seed_classes():
+    """Generate n random classes.
+
+    Body (JSON, all optional):
+        n      int   Number of classes to generate (1–50, default 10).
+        clear  bool  If true, delete all existing classes first (only those with no enrollments).
+
+    Returns the list of newly added classes.
+    """
+    data = request.json or {}
+
+    n_raw = data.get("n", 10)
+    try:
+        n = int(n_raw)
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "n must be an integer."}), 400
+    if not (1 <= n <= 50):
+        return jsonify({"success": False, "error": "n must be between 1 and 50."}), 400
+
+    clear = bool(data.get("clear", False))
+    if clear:
+        for cls in list(class_manager.get_all_classes()):
+            try:
+                class_manager.delete_class(cls.id)
+            except ValueError:
+                pass  # skip classes with enrollments
+
+    from datetime import date as _date, timedelta as _td
+    today = _date.today()
+
+    # Pick n unique templates
+    pool = list(_CLASS_TEMPLATES)
+    random.shuffle(pool)
+    templates = pool[:n]
+
+    added = []
+    for code, title in templates:
+        credits = random.choice(_CREDIT_OPTIONS)
+        # Randomise term: either current or next semester (roughly 4-month windows)
+        offset_months = random.choice([0, 4, 8])
+        term_start = today.replace(day=1) + _td(days=offset_months * 30)
+        term_end = term_start + _td(days=random.randint(90, 120))
+        try:
+            record = class_manager.add_class(
+                code=code,
+                title=title,
+                credits=credits,
+                term_start=term_start,
+                term_end=term_end,
+            )
+            added.append(record)
+        except ValueError:
+            pass  # duplicate code or invalid — skip
+
+    if not _save_dataset():
+        return jsonify({"success": False, "error": "Classes generated but could not be saved."}), 503
+
+    return jsonify({
+        "success": True,
+        "added": len(added),
+        "classes": [_class_payload(c) for c in added],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Seed — generate random deadlines
+# ---------------------------------------------------------------------------
+
+_DEADLINE_TEMPLATES = {
+    "assignment": [
+        "Problem Set {n}", "Homework {n}", "Lab Report {n}", "Reading Response {n}",
+        "Case Study {n}", "Weekly Journal {n}", "Programming Assignment {n}",
+        "Data Analysis {n}", "Research Summary {n}", "Worksheet {n}",
+    ],
+    "exam": [
+        "Midterm Exam", "Final Exam", "Quiz {n}", "In-Class Test {n}",
+        "Practical Exam", "Oral Examination", "Online Assessment {n}",
+    ],
+    "project": [
+        "Group Project Proposal", "Final Project Submission", "Project Milestone {n}",
+        "Capstone Presentation", "Design Prototype", "Research Paper",
+        "Portfolio Submission", "Team Deliverable {n}",
+    ],
+    "other": [
+        "Course Withdrawal Deadline", "Grade Appeal Deadline",
+        "Scholarship Application", "Internship Application Deadline",
+        "Peer Review Submission", "Self-Evaluation Form",
+    ],
+}
+
+
+@app.route('/api/seed/deadlines', methods=['POST'])
+def seed_deadlines():
+    """Generate n random deadlines spread across the next 90 days.
+
+    Body (JSON, all optional):
+        n      int   Number of deadlines to generate (1–100, default 10).
+        clear  bool  If true, remove all existing deadlines first.
+
+    Returns the list of newly added deadlines.
+    """
+    data = request.json or {}
+
+    n_raw = data.get("n", 10)
+    try:
+        n = int(n_raw)
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "n must be an integer."}), 400
+    if not (1 <= n <= 100):
+        return jsonify({"success": False, "error": "n must be between 1 and 100."}), 400
+
+    clear = bool(data.get("clear", False))
+    if clear:
+        _deadlines.clear()
+
+    from datetime import date as _date, timedelta as _td
+    today = _date.today()
+
+    # Weighted type distribution: more assignments, fewer exams/projects
+    types = (
+        ["assignment"] * 5 + ["exam"] * 2 + ["project"] * 2 + ["other"] * 1
+    )
+
+    # Use existing class codes as course names if available
+    existing_codes = [c.code for c in class_manager.get_all_classes()]
+    if not existing_codes:
+        existing_codes = list(set(code for code, _ in _CLASS_TEMPLATES[:15]))
+
+    added = []
+    for i in range(n):
+        d_type = random.choice(types)
+        templates = _DEADLINE_TEMPLATES[d_type]
+        title_template = random.choice(templates)
+        title = title_template.replace("{n}", str(random.randint(1, 9)))
+        course = random.choice(existing_codes)
+        days_ahead = random.randint(-7, 90)   # some overdue, most upcoming
+        due = today + _td(days=days_ahead)
+
+        dl = Deadline(
+            title=title,
+            due_date=due.isoformat(),
+            deadline_type=d_type,
+            course=course,
+            description="",
+        )
+        _deadlines.append(dl)
+        added.append(dl)
+
+    if not deadline_storage.save(_deadlines):
+        # Roll back added entries
+        for dl in added:
+            if dl in _deadlines:
+                _deadlines.remove(dl)
+        return jsonify({"success": False, "error": "Deadlines generated but could not be saved."}), 503
+
+    today_date = date.today()
+    return jsonify({
+        "success": True,
+        "added": len(added),
+        "deadlines": [_deadline_payload(d, today_date) for d in added],
+    })
+
+
+# ---------------------------------------------------------------------------
+# PostgreSQL connection UI — local-demo mode only
+# ---------------------------------------------------------------------------
+
+def _is_loopback(req) -> bool:
+    """Return True only when the request originated from localhost/127.0.0.1/::1."""
+    remote = req.remote_addr or ""
+    return remote in ("127.0.0.1", "::1", "localhost")
+
+
+if LOCAL_DEMO_MODE:
+
+    @app.route('/api/pg/test', methods=['POST'])
+    def pg_test():
+        """Test a PostgreSQL URL without creating schemas, migrating data, or switching
+        the active backend.
+
+        Body: {"url": "postgresql://..."}
+        The URL is used only for the duration of this request and never logged.
+
+        Returns:
+            {"success": true}  on a successful connection ping.
+            {"success": false, "error": "<safe message>"}  on failure.
+        """
+        if not _is_loopback(request):
+            return jsonify({"success": False, "error": "Not available on this binding."}), 403
+
+        data = request.json
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
+        url = data.get("url")
+        if not isinstance(url, str) or not url.strip():
+            return jsonify({"success": False, "error": "url is required."}), 400
+        url = url.strip()
+
+        # Validate that it looks like a PostgreSQL URL (no arbitrary SQL injection path)
+        if not (url.startswith("postgresql://") or url.startswith("postgres://")):
+            return jsonify({"success": False, "error": "url must start with postgresql:// or postgres://."}), 400
+
+        try:
+            from app.storage.postgres_storage import PostgresStorage, _add_connect_timeout, _redact
+            import psycopg2
+            dsn = _add_connect_timeout(url, 5)
+            conn = psycopg2.connect(dsn)
+            conn.close()
+            return jsonify({"success": True})
+        except ImportError:
+            return jsonify({"success": False, "error": "psycopg2 is not installed."}), 503
+        except Exception as exc:
+            from app.storage.postgres_storage import _redact
+            safe = _redact(str(exc))
+            return jsonify({"success": False, "error": safe}), 503
+
+    @app.route('/api/pg/connect', methods=['POST'])
+    def pg_connect():
+        """Switch the active backend to PostgreSQL.
+
+        The schema must already exist (run setup_schema separately).
+        The DATABASE_URL for restarts should be set in the environment, not stored here.
+        Failed connection keeps the previous backend unchanged.
+
+        Body: {"url": "postgresql://..."}
+        The URL is held in process memory only — never returned, logged, or stored
+        in browser storage, committed files, or URL query strings.
+
+        Returns:
+            {"success": true, "backend": "postgres"}  on switch.
+            {"success": false, "error": "<safe message>"}  on failure.
+        """
+        if not _is_loopback(request):
+            return jsonify({"success": False, "error": "Not available on this binding."}), 403
+
+        data = request.json
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
+        url = data.get("url")
+        if not isinstance(url, str) or not url.strip():
+            return jsonify({"success": False, "error": "url is required."}), 400
+        url = url.strip()
+
+        if not (url.startswith("postgresql://") or url.startswith("postgres://")):
+            return jsonify({"success": False, "error": "url must start with postgresql:// or postgres://."}), 400
+
+        try:
+            from app.storage.postgres_storage import PostgresStorage
+            new_storage = PostgresStorage(url, connect_timeout=5)
+            manager.set_storage(new_storage)
+            # Reload full dataset from the new backend
+            _ds = new_storage.load_dataset()
+            with manager._lock:
+                manager._students = _ds.students
+            class_manager.load_from_data(_ds.classes, _ds.enrollments)
+            return jsonify({"success": True, "backend": "postgres"})
+        except ImportError:
+            return jsonify({"success": False, "error": "psycopg2 is not installed."}), 503
+        except Exception as exc:
+            from app.storage.postgres_storage import _redact
+            safe = _redact(str(exc))
+            return jsonify({"success": False, "error": safe}), 503
 
 
 if __name__ == '__main__':

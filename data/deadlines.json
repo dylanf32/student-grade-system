@@ -1,0 +1,227 @@
+[
+    {
+        "id": "b4d81b42-1ffe-4535-b25f-d9c80c827c72",
+        "title": "Team Deliverable 1",
+        "type": "project",
+        "due_date": "2026-12-28",
+        "course": "MATH102",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "31ca4765-462f-4da6-8f2c-6a5dbb739c57",
+        "title": "Research Summary 1",
+        "type": "assignment",
+        "due_date": "2026-10-25",
+        "course": "CS470",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "ab51271b-7196-4b2c-97eb-4544de6bfc1a",
+        "title": "Research Summary 8",
+        "type": "assignment",
+        "due_date": "2026-11-09",
+        "course": "MATH201",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "68019cb4-72c6-4b9e-b29a-c8e8f8e5e988",
+        "title": "Problem Set 4",
+        "type": "assignment",
+        "due_date": "2026-11-24",
+        "course": "PHIL201",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "c3a5b1a3-72da-408f-9b1a-55d19a6dd917",
+        "title": "Final Exam",
+        "type": "exam",
+        "due_date": "2027-01-06",
+        "course": "AI301",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "71de39fa-c2cf-4a57-9baa-dec726d06b08",
+        "title": "Homework 7",
+        "type": "assignment",
+        "due_date": "2026-11-23",
+        "course": "BUS101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "a71f9a6a-72d4-4ae1-b079-c3cc50fe1aa4",
+        "title": "Self-Evaluation Form",
+        "type": "other",
+        "due_date": "2026-11-27",
+        "course": "ECON201",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "4cca856b-3fba-4901-98af-abfd1d7f1295",
+        "title": "Scholarship Application",
+        "type": "other",
+        "due_date": "2026-10-24",
+        "course": "SOC101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "73a74a22-1633-447a-85c4-323018dc0328",
+        "title": "Practical Exam",
+        "type": "exam",
+        "due_date": "2026-11-15",
+        "course": "CS401",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "cfefbde9-a965-43a4-90f7-20f10a6dc200",
+        "title": "Group Project Proposal",
+        "type": "project",
+        "due_date": "2026-12-15",
+        "course": "HIST101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "d3bc9e86-eb34-4df9-b8e6-400516d372a7",
+        "title": "Data Analysis 2",
+        "type": "assignment",
+        "due_date": "2026-10-13",
+        "course": "POLS101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "b955390c-7b8d-4bd6-ac39-d6cb81f7a725",
+        "title": "Programming Assignment 3",
+        "type": "assignment",
+        "due_date": "2026-12-13",
+        "course": "PHYS101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "17a2a94b-76aa-4af5-8d44-3e0dab8613db",
+        "title": "Reading Response 4",
+        "type": "assignment",
+        "due_date": "2026-11-03",
+        "course": "PROJ401",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "693c1205-fbea-4806-baba-aa7bf6b2a74c",
+        "title": "Capstone Presentation",
+        "type": "project",
+        "due_date": "2026-10-02",
+        "course": "PHYS101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "5730988f-01b3-4add-b1a1-131e655cb833",
+        "title": "Homework 5",
+        "type": "assignment",
+        "due_date": "2026-11-25",
+        "course": "MATH201",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "a919965d-3ddf-4c7d-8053-aa89d9728513",
+        "title": "Research Summary 2",
+        "type": "assignment",
+        "due_date": "2026-12-05",
+        "course": "ENG101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "87eb758d-4c2e-48c4-86de-ca92a01dfc07",
+        "title": "Weekly Journal 9",
+        "type": "assignment",
+        "due_date": "2026-12-17",
+        "course": "ENG101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "dd5634fc-d044-41df-900e-d849dcbf1c60",
+        "title": "Reading Response 6",
+        "type": "assignment",
+        "due_date": "2026-12-28",
+        "course": "PROJ401",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "4199b0ca-3ac5-4ce4-8eb9-0d2faa4fd524",
+        "title": "Weekly Journal 5",
+        "type": "assignment",
+        "due_date": "2026-10-25",
+        "course": "MATH301",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "0f3ca89b-30ee-43d1-b8bc-f95c94e3399f",
+        "title": "Project Milestone 3",
+        "type": "project",
+        "due_date": "2026-11-11",
+        "course": "MATH101",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "8dc211ad-47c1-4683-9f91-32e077501120",
+        "title": "Oral Examination",
+        "type": "exam",
+        "due_date": "2026-10-12",
+        "course": "STAT201",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "b3d6bdfa-cc85-407a-88c3-7b322224f761",
+        "title": "Worksheet 3",
+        "type": "assignment",
+        "due_date": "2026-10-17",
+        "course": "STAT201",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "cdb898f4-0f68-4ea9-b172-9a3bc300af39",
+        "title": "Case Study 5",
+        "type": "assignment",
+        "due_date": "2026-10-03",
+        "course": "BUS301",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "bedb766d-513e-4f18-b283-6d2b7a7db08e",
+        "title": "Internship Application Deadline",
+        "type": "other",
+        "due_date": "2026-12-03",
+        "course": "CS401",
+        "description": "",
+        "student_id": null
+    },
+    {
+        "id": "9d5134cc-0593-40df-bc41-08aca1274c25",
+        "title": "Case Study 3",
+        "type": "assignment",
+        "due_date": "2026-11-29",
+        "course": "ECON101",
+        "description": "",
+        "student_id": null
+    }
+]

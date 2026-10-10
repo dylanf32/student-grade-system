@@ -39,6 +39,14 @@
                 <span>Deadlines</span>
                 <span id="deadline-nav-badge" class="nav-badge hidden"></span>
             </button>
+            <button class="nav-item" data-tab="classes">
+                <i class="fa-solid fa-chalkboard-user"></i>
+                <span>Classes</span>
+            </button>
+            <button class="nav-item hidden" id="nav-pg-settings" data-action="pg-settings">
+                <i class="fa-solid fa-database"></i>
+                <span>PostgreSQL</span>
+            </button>
         </nav>
         <div class="sidebar-footer">
             <span id="connection-status" class="status-pill status-connected">
@@ -69,9 +77,14 @@
                     <h1 class="page-title">Overview</h1>
                     <p class="page-sub">Live snapshot of your class performance</p>
                 </div>
-                <button id="btn-save-db" class="btn btn-secondary">
-                    <i class="fa-solid fa-floppy-disk"></i> Save
-                </button>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <button id="btn-generate-students" class="btn btn-primary">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Students
+                    </button>
+                    <button id="btn-save-db" class="btn btn-secondary">
+                        <i class="fa-solid fa-floppy-disk"></i> Save
+                    </button>
+                </div>
             </div>
 
             <!-- Welcome banner -->
@@ -176,9 +189,14 @@
                     <h1 class="page-title">Deadlines</h1>
                     <p class="page-sub">Track assignments, exams, and project due dates</p>
                 </div>
-                <button id="btn-open-deadline-modal" class="btn btn-primary">
-                    <i class="fa-solid fa-plus"></i> Add Deadline
-                </button>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <button id="btn-generate-deadlines" class="btn btn-secondary">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
+                    </button>
+                    <button id="btn-open-deadline-modal" class="btn btn-primary">
+                        <i class="fa-solid fa-plus"></i> Add Deadline
+                    </button>
+                </div>
             </div>
 
             <!-- Deadlines table -->
@@ -396,8 +414,78 @@
                 <p>No data yet. Add some students to see analytics.</p>
             </div>
         </div>
-    </div>
 
+        <!-- ══ TAB: CLASSES ════════════════════════════════════════════════ -->
+        <div class="tab-page" id="tab-classes">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Classes</h1>
+                        <p class="page-sub" id="classes-subtitle">Loading…</p>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <button id="btn-generate-classes" class="btn btn-secondary">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
+                        </button>
+                        <button id="btn-open-class-modal" class="btn btn-primary">
+                            <i class="fa-solid fa-plus"></i> New Class
+                        </button>
+                    </div>
+                </div>
+    
+                <!-- Class selector bar -->
+                <div class="class-selector-bar card glass-card" id="class-selector-bar">
+                    <div class="class-selector-inner">
+                        <button id="btn-all-students" class="class-chip active" data-class-id="">
+                            <i class="fa-solid fa-users"></i> All Students
+                        </button>
+                        <div id="class-chips-list" class="class-chips-list"></div>
+                    </div>
+                </div>
+    
+                <!-- Classes table -->
+                <div class="card glass-card table-card" id="classes-table-card">
+                    <div class="table-container">
+                        <table class="students-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Title</th>
+                                    <th>Credits</th>
+                                    <th>Term Start</th>
+                                    <th>Term End</th>
+                                    <th>Enrolled</th>
+                                    <th class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="classes-table-body">
+                                <tr>
+                                    <td colspan="7" class="table-loading">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading classes…
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+    
+                <div id="classes-empty-state" class="table-empty hidden">
+                    <div class="table-empty-icon"><i class="fa-solid fa-chalkboard"></i></div>
+                    <p>No classes yet. Click <strong>New Class</strong> to get started!</p>
+                </div>
+    
+            <!-- Enrollment panel (shown when a class is selected) -->
+            <div id="enrollment-panel" class="card glass-card enrollment-panel hidden">
+                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                    <h2 id="enrollment-panel-title"><i class="fa-solid fa-user-group" style="color:var(--primary);"></i> Enrolled Students</h2>
+                    <span id="enrollment-count-badge" class="result-badge"></span>
+                </div>
+                <div class="card-body" style="padding-top:0.5rem;">
+                    <div id="enrollment-all-students-list" class="enrollment-students-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- ══ Add Student Drawer ═══════════════════════════════════════════════ -->
     <div class="drawer-overlay hidden" id="add-drawer-overlay"></div>
     <aside class="drawer hidden" id="add-drawer">
@@ -646,6 +734,199 @@
                         <button type="button" id="deadline-cancel-btn" class="btn btn-secondary">Cancel</button>
                         <button type="submit" class="btn btn-primary" id="deadline-submit-btn">
                             <i class="fa-solid fa-plus"></i> Add Deadline
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── PostgreSQL Connection Modal (local-demo mode only) ────────────── -->
+    <div id="pg-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal animate-scale">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-database"></i> PostgreSQL Connection</h3>
+                <button class="btn-close" id="pg-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc" style="margin-bottom:1rem;">
+                    Connect to a PostgreSQL database. The schema must already exist
+                    (<code>setup_schema</code>). Credentials are held in server memory only
+                    and are never stored in the browser.
+                </p>
+                <div class="form-group">
+                    <label for="pg-url-input">PostgreSQL URL</label>
+                    <div class="input-wrapper pg-url-wrapper">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" id="pg-url-input"
+                               placeholder="postgresql://user:pass@host:5432/dbname"
+                               autocomplete="off" spellcheck="false">
+                        <button type="button" id="pg-url-toggle" class="btn-pg-eye"
+                                aria-label="Toggle URL visibility">
+                            <i class="fa-solid fa-eye" id="pg-eye-icon"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="pg-status-msg" class="pg-status-msg hidden"></div>
+                <div class="modal-actions">
+                    <button type="button" id="pg-cancel-btn" class="btn btn-secondary">Cancel</button>
+                    <button type="button" id="pg-test-btn" class="btn btn-secondary">
+                        <i class="fa-solid fa-plug-circle-check"></i> Test
+                    </button>
+                    <button type="button" id="pg-connect-btn" class="btn btn-primary">
+                        <i class="fa-solid fa-database"></i> Connect
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Class Create / Edit Modal ─────────────────────────────────────── -->
+    <div id="class-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal animate-scale">
+            <div class="modal-header">
+                <h3 id="class-modal-title"><i class="fa-solid fa-plus"></i> New Class</h3>
+                <button class="btn-close" id="class-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="class-form">
+                    <input type="hidden" id="class-edit-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="class-code">Course Code <span class="req">*</span></label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-hashtag input-icon"></i>
+                                <input type="text" id="class-code" placeholder="e.g. CS101" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="class-credits">Credits</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-star input-icon"></i>
+                                <input type="number" id="class-credits" min="0.5" max="20" step="0.5" value="3" placeholder="3">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="class-title">Title <span class="req">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-chalkboard input-icon"></i>
+                            <input type="text" id="class-title" placeholder="e.g. Introduction to Computer Science" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="class-term-start">Term Start</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-calendar-day input-icon"></i>
+                                <input type="date" id="class-term-start">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="class-term-end">Term End</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-calendar-check input-icon"></i>
+                                <input type="date" id="class-term-end">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="class-cancel-btn" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" id="class-submit-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-plus"></i> Create Class
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Seed / Generate Students Modal ────────────────────────────────── -->
+    <div id="seed-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal animate-scale" style="max-width:400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Generate Random Students</h3>
+                <button class="btn-close" id="seed-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="seed-form">
+                    <div class="form-group">
+                        <label for="seed-n">Number of students to generate (1–100)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-users input-icon"></i>
+                            <input type="number" id="seed-n" min="1" max="100" value="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group" style="display:flex;align-items:center;gap:0.6rem;">
+                        <input type="checkbox" id="seed-clear" style="width:1rem;height:1rem;cursor:pointer;">
+                        <label for="seed-clear" style="margin:0;cursor:pointer;">Clear existing students first</label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="seed-cancel-btn" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" id="seed-submit-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Seed Classes Modal ────────────────────────────────────────────── -->
+    <div id="seed-classes-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal animate-scale" style="max-width:400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Generate Random Classes</h3>
+                <button class="btn-close" id="seed-classes-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="seed-classes-form">
+                    <div class="form-group">
+                        <label for="seed-classes-n">Number of classes to generate (1–50)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-chalkboard-user input-icon"></i>
+                            <input type="number" id="seed-classes-n" min="1" max="50" value="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group" style="display:flex;align-items:center;gap:0.6rem;">
+                        <input type="checkbox" id="seed-classes-clear" style="width:1rem;height:1rem;cursor:pointer;">
+                        <label for="seed-classes-clear" style="margin:0;cursor:pointer;">Clear existing classes first (unenrolled only)</label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="seed-classes-cancel-btn" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" id="seed-classes-submit-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Seed Deadlines Modal ───────────────────────────────────────────── -->
+    <div id="seed-deadlines-modal" class="modal-overlay hidden">
+        <div class="modal glass-modal animate-scale" style="max-width:400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Generate Random Deadlines</h3>
+                <button class="btn-close" id="seed-deadlines-modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="seed-deadlines-form">
+                    <div class="form-group">
+                        <label for="seed-deadlines-n">Number of deadlines to generate (1–100)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-calendar-days input-icon"></i>
+                            <input type="number" id="seed-deadlines-n" min="1" max="100" value="10" required>
+                        </div>
+                    </div>
+                    <div class="form-group" style="display:flex;align-items:center;gap:0.6rem;">
+                        <input type="checkbox" id="seed-deadlines-clear" style="width:1rem;height:1rem;cursor:pointer;">
+                        <label for="seed-deadlines-clear" style="margin:0;cursor:pointer;">Clear existing deadlines first</label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" id="seed-deadlines-cancel-btn" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" id="seed-deadlines-submit-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate
                         </button>
                     </div>
                 </form>

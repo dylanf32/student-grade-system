@@ -337,6 +337,19 @@ class StudentManager:
             self._students = students
         return len(self._students)
 
+    def set_storage(self, new_storage: BaseStorage) -> None:
+        """Replace the active storage backend.
+
+        Used by the PostgreSQL connection endpoint to switch backends at runtime
+        without restarting the server.  The caller is responsible for calling
+        ``load()`` immediately after to populate the in-memory roster from the
+        new backend.
+
+        Args:
+            new_storage: The replacement BaseStorage implementation.
+        """
+        self._storage = new_storage
+
     # ═══════════════════════════════════════════════════════════════════════
     #  CSV Import / Export
     # ═══════════════════════════════════════════════════════════════════════

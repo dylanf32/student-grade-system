@@ -7,6 +7,7 @@ No external dependencies required beyond the stdlib.
 Schema history:
     v1 — initial: id, name, grade, email, major, academic_year, gpa, courses, notes
     v2 — added:   linkedin_url, department, groups (JSON blob)
+    v3 — added:   classes, enrollments tables (A6)
 """
 
 import json
@@ -14,9 +15,9 @@ import sqlite3
 from typing import List
 
 from app.models.student import Student, CourseGrade
-from app.storage.base_storage import BaseStorage
+from app.storage.base_storage import BaseStorage, DatasetPayload
 
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
 
 class SqliteStorage(BaseStorage):
@@ -51,8 +52,8 @@ class SqliteStorage(BaseStorage):
     # ── Schema ───────────────────────────────────────────────────────────
 
     def _init_schema(self) -> None:
-        """Create the students table and run any pending column migrations."""
-        self._conn.execute("""
+        """Create all tables and run any pending column migrations."""
+        self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS students (
                 id            TEXT PRIMARY KEY,
                 name          TEXT NOT NULL,
@@ -66,7 +67,21 @@ class SqliteStorage(BaseStorage):
                 linkedin_url  TEXT NOT NULL DEFAULT '',
                 department    TEXT NOT NULL DEFAULT '',
                 groups        TEXT NOT NULL DEFAULT '[]'
-            )
+            );
+            CREATE TABLE IF NOT EXISTS classes (
+                id          TEXT PRIMARY KEY,
+                code        TEXT NOT NULL,
+                title       TEXT NOT NULL,
+                credits     REAL NOT NULL DEFAULT 3.0,
+                term_start  TEXT,
+                term_end    TEXT
+            );
+            CREATE TABLE IF NOT EXISTS enrollments (
+                student_id  TEXT NOT NULL,
+                class_id    TEXT NOT NULL,
+                PRIMARY KEY (student_id, class_id),
+                FOREIGN KEY (class_id) REFERENCES classes(id)
+            );
         """)
         self._conn.commit()
         # Migrate pre-existing databases that are missing the v2 columns.
@@ -183,3 +198,92 @@ class SqliteStorage(BaseStorage):
         except Exception as exc:
             print(f"  [SqliteStorage Error] Could not load: {exc}")
             return []
+
+    def save_dataset(
+        self,
+        students: List[Student],
+        classes: List[dict],
+        enrollments: List[dict],
+    ) -> bool:
+        """Atomically persist students, classes, and enrollments.
+
+        Replaces all three tables in a single transaction so a mid-save crash
+        cannot leave the database in a half-written state.
+
+        Args:
+            students:    Complete list of Student objects.
+            classes:     Serialized ClassRecord dicts (from ClassRecord.to_dict).
+            enrollments: Serialized enrollment dicts {"student_id": …, "class_id": …}.
+
+        Returns:
+            True on success, False on failure.
+        """
+        try:
+            with self._conn:
+                # Students
+                self._conn.execute("DELETE FROM students")
+                self._conn.executemany(
+                    """
+                    INSERT INTO students
+                        (id, name, grade, email, major, academic_year, gpa,
+                         courses, notes, linkedin_url, department, groups)
+                    VALUES
+                        (:id, :name, :grade, :email, :major, :academic_year, :gpa,
+                         :courses, :notes, :linkedin_url, :department, :groups)
+                    """,
+                    [self._student_to_row(s) for s in students],
+                )
+                # Classes
+                self._conn.execute("DELETE FROM enrollments")
+                self._conn.execute("DELETE FROM classes")
+                self._conn.executemany(
+                    """
+                    INSERT INTO classes (id, code, title, credits, term_start, term_end)
+                    VALUES (:id, :code, :title, :credits, :term_start, :term_end)
+                    """,
+                    classes,
+                )
+                # Enrollments (inserted after classes due to FK)
+                self._conn.executemany(
+                    "INSERT INTO enrollments (student_id, class_id) VALUES (:student_id, :class_id)",
+                    enrollments,
+                )
+            return True
+        except Exception as exc:
+            print(f"  [SqliteStorage Error] Could not save dataset: {exc}")
+            return False
+
+    def load_dataset(self) -> DatasetPayload:
+        """Load the complete dataset (students, classes, enrollments).
+
+        Returns:
+            DatasetPayload with all three collections populated.
+        """
+        students = self.load()
+        try:
+            class_rows = self._conn.execute(
+                "SELECT id, code, title, credits, term_start, term_end FROM classes"
+            ).fetchall()
+            classes = [
+                {
+                    "id": r["id"],
+                    "code": r["code"],
+                    "title": r["title"],
+                    "credits": r["credits"],
+                    "term_start": r["term_start"],
+                    "term_end": r["term_end"],
+                }
+                for r in class_rows
+            ]
+            enroll_rows = self._conn.execute(
+                "SELECT student_id, class_id FROM enrollments"
+            ).fetchall()
+            enrollments = [
+                {"student_id": r["student_id"], "class_id": r["class_id"]}
+                for r in enroll_rows
+            ]
+        except Exception as exc:
+            print(f"  [SqliteStorage Error] Could not load dataset: {exc}")
+            classes = []
+            enrollments = []
+        return DatasetPayload(students=students, classes=classes, enrollments=enrollments)
